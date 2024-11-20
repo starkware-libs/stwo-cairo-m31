@@ -250,7 +250,7 @@ impl Instructions {
             } => {
                 let dst_addr = if dst_base_fp { fp } else { ap };
                 let dst = mem.get(dst_addr.checked_add_signed(offset0 as i32).unwrap());
-                let taken = dst != MemoryValue::Small(0);
+                let taken = dst != MemoryValue(0.into());
                 let index = (dst_base_fp as usize)
                     | (taken as usize) << 1
                     | (ap_update_add_1 as usize) << 2;

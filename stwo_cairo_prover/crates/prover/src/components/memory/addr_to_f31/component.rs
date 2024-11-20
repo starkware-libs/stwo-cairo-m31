@@ -1,5 +1,3 @@
-use itertools::Itertools;
-use num_traits::One;
 use serde::{Deserialize, Serialize};
 use stwo_prover::constraint_framework::logup::{LogupAtRow, LookupElements};
 use stwo_prover::constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval};
@@ -9,28 +7,24 @@ use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
 use stwo_prover::core::lookups::utils::Fraction;
 use stwo_prover::core::pcs::TreeVec;
 
-use crate::components::range_check_vector::range_check_9_9;
-
 pub const MEMORY_ID_SIZE: usize = 1;
-pub const N_M31_IN_FELT252: usize = 28;
-pub const N_ID_AND_VALUE_COLUMNS: usize = MEMORY_ID_SIZE + N_M31_IN_FELT252;
-pub const MULTIPLICITY_COLUMN_OFFSET: usize = N_ID_AND_VALUE_COLUMNS;
+pub const VALUE_SIZE: usize = 4;
+pub const N_ADDR_AND_VALUE_COLUMNS: usize = MEMORY_ID_SIZE + VALUE_SIZE;
+pub const MULTIPLICITY_COLUMN_OFFSET: usize = N_ADDR_AND_VALUE_COLUMNS;
 pub const N_MULTIPLICITY_COLUMNS: usize = 1;
 // TODO(AlonH): Make memory size configurable.
-pub const N_COLUMNS: usize = N_ID_AND_VALUE_COLUMNS + N_MULTIPLICITY_COLUMNS;
+pub const N_COLUMNS: usize = N_ADDR_AND_VALUE_COLUMNS + N_MULTIPLICITY_COLUMNS;
 
 pub type Component = FrameworkComponent<Eval>;
 
-const N_LOGUP_POWERS: usize = MEMORY_ID_SIZE + N_M31_IN_FELT252;
+const N_LOGUP_POWERS: usize = MEMORY_ID_SIZE + VALUE_SIZE;
 pub type RelationElements = LookupElements<N_LOGUP_POWERS>;
 
 /// IDs are continuous and start from 0.
-/// Values are Felt252 stored as `N_M31_IN_FELT252` M31 values (each value containing 9 bits).
 #[derive(Clone)]
 pub struct Eval {
     pub log_n_rows: u32,
     pub lookup_elements: RelationElements,
-    pub range9_9_lookup_elements: range_check_9_9::RelationElements,
     pub claimed_sum: QM31,
 }
 impl Eval {
@@ -40,13 +34,11 @@ impl Eval {
     pub fn new(
         claim: Claim,
         lookup_elements: RelationElements,
-        range9_9_lookup_elements: range_check_9_9::RelationElements,
         interaction_claim: InteractionClaim,
     ) -> Self {
         Self {
             log_n_rows: claim.log_size,
             lookup_elements,
-            range9_9_lookup_elements,
             claimed_sum: interaction_claim.claimed_sum,
         }
     }
@@ -65,7 +57,7 @@ impl FrameworkEval for Eval {
         let [is_first] = eval.next_interaction_mask(2, [0]);
         let mut logup = LogupAtRow::<E>::new(1, self.claimed_sum, None, is_first);
 
-        let id_and_value: [E::F; MEMORY_ID_SIZE + N_M31_IN_FELT252] =
+        let id_and_value: [E::F; N_ADDR_AND_VALUE_COLUMNS] =
             std::array::from_fn(|_| eval.next_trace_mask());
         let multiplicity = eval.next_trace_mask();
         let frac = Fraction::new(
@@ -73,16 +65,6 @@ impl FrameworkEval for Eval {
             self.lookup_elements.combine(&id_and_value),
         );
         logup.write_frac(&mut eval, frac);
-
-        // Range check elements.
-        for (l, r) in id_and_value[MEMORY_ID_SIZE..].iter().tuples() {
-            let frac = Fraction::new(
-                E::EF::one(),
-                self.range9_9_lookup_elements
-                    .combine(&[l.clone(), r.clone()]),
-            );
-            logup.write_frac(&mut eval, frac);
-        }
 
         logup.finalize(&mut eval);
 
@@ -97,8 +79,7 @@ pub struct Claim {
 impl Claim {
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
         let interaction_0_log_size = vec![self.log_size; N_COLUMNS];
-        let interaction_1_log_size =
-            vec![self.log_size; SECURE_EXTENSION_DEGREE * (N_M31_IN_FELT252 / 2 + 1)];
+        let interaction_1_log_size = vec![self.log_size; SECURE_EXTENSION_DEGREE]; // ???
         let fixed_column_log_sizes = vec![self.log_size];
         TreeVec::new(vec![
             interaction_0_log_size,

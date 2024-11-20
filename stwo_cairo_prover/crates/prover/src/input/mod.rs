@@ -6,7 +6,6 @@ mod decode;
 pub mod instructions;
 pub mod mem;
 pub mod plain;
-pub mod range_check_unit;
 pub mod vm_import;
 
 pub const N_REGISTERS: usize = 3;

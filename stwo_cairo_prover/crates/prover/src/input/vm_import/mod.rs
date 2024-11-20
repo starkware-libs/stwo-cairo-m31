@@ -6,6 +6,7 @@ use std::path::Path;
 use bytemuck::{bytes_of_mut, Pod, Zeroable};
 use cairo_vm::vm::trace::trace_entry::RelocatedTraceEntry;
 use json::{PrivateInput, PublicInput};
+use stwo_prover::core::fields::qm31::QM31;
 use thiserror::Error;
 use tracing::{span, Level};
 
@@ -102,11 +103,12 @@ impl<'a, R: Read> Iterator for TraceIter<'a, R> {
 
 /// A single entry from the memory file.
 /// Note: This struct must be kept in sync with the Cairo VM's memory output file.
+/// FIXME: this is shit
 #[repr(C)]
 #[derive(Copy, Clone, Default, Pod, Zeroable)]
 pub struct MemEntry {
-    pub addr: u64,
-    pub val: [u32; 8],
+    pub addr: u32,
+    pub val: [u32; 4],
 }
 
 pub struct MemEntryIter<'a, R: Read>(pub &'a mut R);
