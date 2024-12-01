@@ -24,11 +24,11 @@ pub type InstructionArgs = [M31; 3];
 
 pub struct Instruction {
     _op: M31,
-    args: InstructionArgs,
+    _args: InstructionArgs,
 }
 
 // TODO(alont): autogenerate this.
-pub fn opcode_to_instruction(opcode: usize) -> fn(&mut Memory, State, Instruction) -> State {
+pub fn opcode_to_instruction(opcode: usize) -> fn(&mut Memory, State, InstructionArgs) -> State {
     match opcode {
         0 => addap_add_ap_ap,
         1 => addap_add_ap_fp,
