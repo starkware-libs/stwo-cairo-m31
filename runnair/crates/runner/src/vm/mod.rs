@@ -1,10 +1,12 @@
 pub mod add_ap;
+pub mod assert;
 pub mod jmp;
 pub mod operand;
 
 use stwo_prover::core::fields::m31::M31;
 
 use self::add_ap::*;
+use self::assert::*;
 use self::jmp::*;
 use crate::memory::Memory;
 
@@ -13,6 +15,24 @@ pub struct State {
     ap: M31,
     fp: M31,
     pc: M31,
+}
+
+impl State {
+    pub fn advance(self) -> Self {
+        Self {
+            ap: self.ap,
+            fp: self.fp,
+            pc: self.pc + M31(1),
+        }
+    }
+
+    pub fn advance_and_increment_ap(self) -> Self {
+        Self {
+            ap: self.ap + M31(1),
+            fp: self.fp,
+            pc: self.pc + M31(1),
+        }
+    }
 }
 
 pub struct VM {
@@ -47,14 +67,14 @@ pub fn opcode_to_instruction(opcode: usize) -> fn(&mut Memory, State, Instructio
         14 => addap_mul_fp_fp,
         15 => addap_mul_imm_ap,
         16 => addap_mul_imm_fp,
-        17 => unimplemented!(), // assert_ap_add_ap_ap,
-        18 => unimplemented!(), // assert_ap_add_ap_ap_appp,
-        19 => unimplemented!(), // assert_ap_add_ap_fp,
-        20 => unimplemented!(), // assert_ap_add_ap_fp_appp,
-        21 => unimplemented!(), // assert_ap_add_fp_ap,
-        22 => unimplemented!(), // assert_ap_add_fp_ap_appp,
-        23 => unimplemented!(), // assert_ap_add_fp_fp,
-        24 => unimplemented!(), // assert_ap_add_fp_fp_appp,
+        17 => assert_ap_add_ap_ap,
+        18 => assert_ap_add_ap_ap_appp,
+        19 => assert_ap_add_ap_fp,
+        20 => assert_ap_add_ap_fp_appp,
+        21 => assert_ap_add_fp_ap,
+        22 => assert_ap_add_fp_ap_appp,
+        23 => assert_ap_add_fp_fp,
+        24 => assert_ap_add_fp_fp_appp,
         25 => unimplemented!(), // assert_ap_add_imm_ap,
         26 => unimplemented!(), // assert_ap_add_imm_ap_appp,
         27 => unimplemented!(), // assert_ap_add_imm_fp,
@@ -81,14 +101,14 @@ pub fn opcode_to_instruction(opcode: usize) -> fn(&mut Memory, State, Instructio
         48 => unimplemented!(), // assert_ap_mul_imm_ap_appp,
         49 => unimplemented!(), // assert_ap_mul_imm_fp,
         50 => unimplemented!(), // assert_ap_mul_imm_fp_appp,
-        51 => unimplemented!(), // assert_fp_add_ap_ap,
-        52 => unimplemented!(), // assert_fp_add_ap_ap_appp,
-        53 => unimplemented!(), // assert_fp_add_ap_fp,
-        54 => unimplemented!(), // assert_fp_add_ap_fp_appp,
-        55 => unimplemented!(), // assert_fp_add_fp_ap,
-        56 => unimplemented!(), // assert_fp_add_fp_ap_appp,
-        57 => unimplemented!(), // assert_fp_add_fp_fp,
-        58 => unimplemented!(), // assert_fp_add_fp_fp_appp,
+        51 => assert_fp_add_ap_ap,
+        52 => assert_fp_add_ap_ap_appp,
+        53 => assert_fp_add_ap_fp,
+        54 => assert_fp_add_ap_fp_appp,
+        55 => assert_fp_add_fp_ap,
+        56 => assert_fp_add_fp_ap_appp,
+        57 => assert_fp_add_fp_fp,
+        58 => assert_fp_add_fp_fp_appp,
         59 => unimplemented!(), // assert_fp_add_imm_ap,
         60 => unimplemented!(), // assert_fp_add_imm_ap_appp,
         61 => unimplemented!(), // assert_fp_add_imm_fp,
