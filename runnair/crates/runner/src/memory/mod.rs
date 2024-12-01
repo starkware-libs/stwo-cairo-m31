@@ -78,7 +78,7 @@ impl Memory {
     pub fn entry<T: Into<MaybeRelocatableAddr>>(
         &mut self,
         key: T,
-    ) -> Entry<MaybeRelocatableAddr, MaybeRelocatableValue> {
+    ) -> Entry<'_, MaybeRelocatableAddr, MaybeRelocatableValue> {
         self.data.entry(key.into())
     }
 }
