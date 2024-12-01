@@ -1,11 +1,12 @@
 use serde::{Deserialize, Serialize};
-use stwo_prover::constraint_framework::logup::{LogupAtRow, LookupElements};
-use stwo_prover::constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval};
+use stwo_prover::constraint_framework::{
+    EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
+};
 use stwo_prover::core::channel::Channel;
 use stwo_prover::core::fields::qm31::{SecureField, QM31};
 use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
-use stwo_prover::core::lookups::utils::Fraction;
 use stwo_prover::core::pcs::TreeVec;
+use stwo_prover::relation;
 
 pub const MEMORY_ID_SIZE: usize = 1;
 pub const VALUE_SIZE: usize = 4;
@@ -17,14 +18,14 @@ pub const N_COLUMNS: usize = N_ADDR_AND_VALUE_COLUMNS + N_MULTIPLICITY_COLUMNS;
 
 pub type Component = FrameworkComponent<Eval>;
 
-const N_LOGUP_POWERS: usize = MEMORY_ID_SIZE + VALUE_SIZE;
-pub type RelationElements = LookupElements<N_LOGUP_POWERS>;
+const N_MEMORY_ELEMS: usize = MEMORY_ID_SIZE + VALUE_SIZE;
+relation!(MemoryRelation, N_MEMORY_ELEMS);
 
 /// IDs are continuous and start from 0.
 #[derive(Clone)]
 pub struct Eval {
     pub log_n_rows: u32,
-    pub lookup_elements: RelationElements,
+    pub lookup_elements: MemoryRelation,
     pub claimed_sum: QM31,
 }
 impl Eval {
@@ -33,7 +34,7 @@ impl Eval {
     }
     pub fn new(
         claim: Claim,
-        lookup_elements: RelationElements,
+        lookup_elements: MemoryRelation,
         interaction_claim: InteractionClaim,
     ) -> Self {
         Self {
@@ -54,19 +55,17 @@ impl FrameworkEval for Eval {
     }
 
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
-        let [is_first] = eval.next_interaction_mask(2, [0]);
-        let mut logup = LogupAtRow::<E>::new(1, self.claimed_sum, None, is_first);
-
         let id_and_value: [E::F; N_ADDR_AND_VALUE_COLUMNS] =
             std::array::from_fn(|_| eval.next_trace_mask());
         let multiplicity = eval.next_trace_mask();
-        let frac = Fraction::new(
-            E::EF::from(-multiplicity),
-            self.lookup_elements.combine(&id_and_value),
-        );
-        logup.write_frac(&mut eval, frac);
 
-        logup.finalize(&mut eval);
+        eval.add_to_relation(&[RelationEntry::new(
+            &self.lookup_elements,
+            -E::EF::from(multiplicity),
+            &id_and_value,
+        )]);
+
+        eval.finalize_logup();
 
         eval
     }

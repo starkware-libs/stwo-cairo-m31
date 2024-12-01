@@ -7,10 +7,6 @@ use stwo_prover::core::fields::qm31::QM31;
 
 use super::vm_import::MemEntry;
 
-/// Prime 2^251 + 17 * 2^192 + 1 in little endian.
-const P_MIN_1: u64 = 0x0000_001E;
-const P_MIN_2: u64 = 0x0000_001D;
-
 // Note: this should be smaller than 2^29.
 const SMALL_VALUE_SHIFT: u32 = 1 << 26;
 

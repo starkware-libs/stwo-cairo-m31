@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use stwo_prover::constraint_framework::logup::LogupTraceGenerator;
+use stwo_prover::constraint_framework::Relation;
 use stwo_prover::core::backend::simd::column::BaseColumn;
 use stwo_prover::core::backend::simd::m31::{PackedBaseField, PackedM31, LOG_N_LANES, N_LANES};
 use stwo_prover::core::backend::simd::qm31::PackedQM31;
@@ -14,7 +15,7 @@ use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleChannel;
 use super::component::{
     Claim, InteractionClaim, MULTIPLICITY_COLUMN_OFFSET, N_ADDR_AND_VALUE_COLUMNS, N_COLUMNS,
 };
-use super::RelationElements;
+use super::MemoryRelation;
 use crate::components::memory::MEMORY_ADDRESS_BOUND;
 use crate::input::mem::{Memory, MemoryValue};
 
@@ -126,7 +127,7 @@ impl InteractionClaimGenerator {
     pub fn write_interaction_trace(
         &self,
         tree_builder: &mut TreeBuilder<'_, '_, SimdBackend, Blake2sMerkleChannel>,
-        lookup_elements: &RelationElements,
+        lookup_elements: &MemoryRelation,
     ) -> InteractionClaim {
         let log_size = self.ids_and_values[0].len().ilog2() + LOG_N_LANES;
         let mut logup_gen = LogupTraceGenerator::new(log_size);
