@@ -6,7 +6,6 @@ use std::path::Path;
 use bytemuck::{bytes_of_mut, Pod, Zeroable};
 use cairo_vm::vm::trace::trace_entry::RelocatedTraceEntry;
 use json::{PrivateInput, PublicInput};
-use stwo_prover::core::fields::qm31::QM31;
 use thiserror::Error;
 use tracing::{span, Level};
 

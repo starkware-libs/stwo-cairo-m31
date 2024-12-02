@@ -1,8 +1,8 @@
 use itertools::{chain, Itertools};
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
-use stwo_prover::constraint_framework::constant_columns::gen_is_first;
-use stwo_prover::constraint_framework::TraceLocationAllocator;
+use stwo_prover::constraint_framework::preprocessed_columns::gen_is_first;
+use stwo_prover::constraint_framework::{Relation, TraceLocationAllocator};
 use stwo_prover::core::air::{Component, ComponentProver};
 use stwo_prover::core::backend::simd::SimdBackend;
 use stwo_prover::core::channel::{Blake2sChannel, Channel};
@@ -53,13 +53,13 @@ impl CairoClaim {
 }
 
 pub struct CairoInteractionElements {
-    memory_id_to_value_lookup: addr_to_f31::RelationElements,
+    memory_id_to_value_lookup: addr_to_f31::MemoryRelation,
     // ...
 }
 impl CairoInteractionElements {
     pub fn draw(channel: &mut impl Channel) -> CairoInteractionElements {
         CairoInteractionElements {
-            memory_id_to_value_lookup: addr_to_f31::RelationElements::draw(channel),
+            memory_id_to_value_lookup: addr_to_f31::MemoryRelation::draw(channel),
         }
     }
 }
@@ -88,10 +88,10 @@ pub fn lookup_sum_valid(
         .public_memory
         .iter()
         .map(|(addr, val)| {
-            elements
+            let denom: SecureField = elements
                 .memory_id_to_value_lookup
-                .combine::<M31, QM31>(&[[*addr].as_slice(), val.to_m31_array().as_slice()].concat())
-                .inverse()
+                .combine(&[[*addr].as_slice(), val.to_m31_array().as_slice()].concat());
+            denom.inverse()
         })
         .sum::<SecureField>();
     // TODO: include initial and final state.
@@ -118,6 +118,10 @@ impl CairoComponents {
                 cairo_claim.memory_id_to_value.clone(),
                 interaction_elements.memory_id_to_value_lookup.clone(),
                 interaction_claim.memory_id_to_value.clone(),
+            ),
+            (
+                interaction_claim.memory_id_to_value.clone().claimed_sum,
+                None,
             ),
         );
         Self {
@@ -150,7 +154,7 @@ pub fn prove_cairo(input: CairoInput) -> Result<CairoProof<Blake2sMerkleHasher>,
 
     // Setup protocol.
     let channel = &mut Blake2sChannel::default();
-    let commitment_scheme = &mut CommitmentSchemeProver::new(config, &twiddles);
+    let mut commitment_scheme = CommitmentSchemeProver::new(config, &twiddles);
 
     // Extract public memory.
     let public_memory = input
