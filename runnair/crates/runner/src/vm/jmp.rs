@@ -5,7 +5,7 @@ use crate::memory::relocatable::assert_and_project;
 use crate::memory::{MaybeRelocatableValue, Memory};
 use crate::vm::{InstructionArgs, State};
 
-pub fn jmp_rel(state: State, operand: M31) -> State {
+fn jmp_rel(state: State, operand: M31) -> State {
     State {
         ap: state.ap,
         fp: state.fp,
@@ -13,7 +13,7 @@ pub fn jmp_rel(state: State, operand: M31) -> State {
     }
 }
 
-pub fn jmp_rel_appp(state: State, operand: M31) -> State {
+fn jmp_rel_appp(state: State, operand: M31) -> State {
     State {
         ap: state.ap + M31(1),
         fp: state.fp,
@@ -21,7 +21,7 @@ pub fn jmp_rel_appp(state: State, operand: M31) -> State {
     }
 }
 
-pub fn jmp_abs(state: State, operand: M31) -> State {
+fn jmp_abs(state: State, operand: M31) -> State {
     State {
         ap: state.ap,
         fp: state.fp,
@@ -29,7 +29,7 @@ pub fn jmp_abs(state: State, operand: M31) -> State {
     }
 }
 
-pub fn jmp_abs_appp(state: State, operand: M31) -> State {
+fn jmp_abs_appp(state: State, operand: M31) -> State {
     State {
         ap: state.ap + M31(1),
         fp: state.fp,
@@ -40,7 +40,7 @@ pub fn jmp_abs_appp(state: State, operand: M31) -> State {
 macro_rules! jmp_with_operand {
     ($operand:ident) => {
         paste! {
-            pub fn [<jmp_rel_ $operand>](
+            pub(crate) fn [<jmp_rel_ $operand>](
                 memory: &mut Memory,
                 state: State,
                 args: InstructionArgs,
@@ -54,7 +54,7 @@ macro_rules! jmp_with_operand {
                 }
             }
 
-            pub fn [<jmp_rel_ $operand _appp>](
+            pub(crate) fn [<jmp_rel_ $operand _appp>](
                 memory: &mut Memory,
                 state: State,
                 args: InstructionArgs,
@@ -68,7 +68,7 @@ macro_rules! jmp_with_operand {
                 }
             }
 
-            pub fn [<jmp_abs_ $operand>](
+            pub(crate) fn [<jmp_abs_ $operand>](
                 memory: &mut Memory,
                 state: State,
                 args: InstructionArgs,
@@ -82,7 +82,7 @@ macro_rules! jmp_with_operand {
                 }
             }
 
-            pub fn [<jmp_abs_ $operand _appp>](
+            pub(crate) fn [<jmp_abs_ $operand _appp>](
                 memory: &mut Memory,
                 state: State,
                 args: InstructionArgs,

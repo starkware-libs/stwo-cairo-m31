@@ -5,7 +5,7 @@ use crate::memory::relocatable::assert_and_project;
 use crate::memory::{MaybeRelocatableValue, Memory};
 use crate::vm::{InstructionArgs, State};
 
-pub fn addap(state: State, summand: M31) -> State {
+fn addap(state: State, summand: M31) -> State {
     State {
         ap: state.ap + summand,
         fp: state.fp,
@@ -16,7 +16,7 @@ pub fn addap(state: State, summand: M31) -> State {
 macro_rules! addap_with_operand {
     ($operand:ident) => {
         paste! {
-            pub fn [<addap_ $operand>](
+            pub(crate) fn [<addap_ $operand>](
                 memory: &mut Memory,
                 state: State,
                 args: InstructionArgs,
