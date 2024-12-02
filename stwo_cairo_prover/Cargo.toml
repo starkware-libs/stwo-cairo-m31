@@ -4,7 +4,6 @@ members = [
     "crates/prover",
     "crates/utils",
     "crates/vm_runner",
-    "crates/prover_types",
 ]
 resolver = "2"
 
