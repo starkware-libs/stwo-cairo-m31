@@ -57,7 +57,7 @@ macro_rules! define_assert {
     ($dest:ident, $op1:ident, $op2:ident) => {
         paste! {
             /// Function without incrementing `ap`: `assert_[ap/fp]_add_[ap/fp]_[ap/fp]`.
-            pub fn [<assert_ $dest _add_ $op1 _ $op2>] (
+            pub(crate) fn [<assert_ $dest _add_ $op1 _ $op2>] (
                 memory: &mut Memory,
                 state: State,
                 args: InstructionArgs,
@@ -71,7 +71,7 @@ macro_rules! define_assert {
             }
 
             /// Function with incrementing `ap`: `assert_[ap/fp]_add_[ap/fp]_[ap/fp][_appp]`.
-            pub fn [<assert_ $dest _add_ $op1 _ $op2 _appp>] (
+            pub(crate) fn [<assert_ $dest _add_ $op1 _ $op2 _appp>] (
                 memory: &mut Memory,
                 state: State,
                 args: InstructionArgs,
