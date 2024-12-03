@@ -53,7 +53,6 @@ fn assign_or_assert_add(memory: &mut Memory, state: State, bases: &[&str; 3], ar
     };
 }
 
-// TODO: handle imm.
 // TODO: handle mul.
 macro_rules! define_assert {
     ($dest:ident, $op1:ident, $op2:ident) => {
@@ -83,6 +82,60 @@ macro_rules! define_assert {
     };
 }
 
+fn assign_or_assert_add_with_imm(
+    memory: &mut Memory,
+    state: State,
+    bases: &[&str; 2],
+    args: &[M31; 3],
+) {
+    let [dest, op1] = bases;
+    let [dest_addr, op1_addr] = resolve_addresses(state, &[dest, op1], &[args[0], args[2]]);
+    let immediate = args[1];
+
+    match (memory.get(dest_addr), memory.get(op1_addr)) {
+        (Some(dest_val), Some(op1_val)) => {
+            assert_eq!(dest_val, op1_val + immediate, "Assertion failed.");
+        }
+        (None, Some(op1_val)) => {
+            let deduced_value = op1_val + immediate;
+            memory.insert(dest_addr, deduced_value);
+        }
+        (Some(dest_val), None) => {
+            let deduced_value = dest_val - immediate;
+            memory.insert(op1_addr, deduced_value);
+        }
+        _ => panic!("Cannot deduce more than one operand"),
+    };
+}
+
+macro_rules! define_assert_with_imm {
+    ($dest:ident, $op1:ident) => {
+        paste! {
+            /// Function without incrementing `ap`: `assert_[ap/fp]_add_imm_[ap/fp]`.
+            pub(crate) fn [<assert_ $dest _add_imm_ $op1>] (
+                memory: &mut Memory,
+                state: State,
+                args: InstructionArgs,
+            ) -> State {
+                let (dest, op1) = (stringify!($dest), stringify!($op1));
+                assign_or_assert_add_with_imm(memory, state, &[dest, op1], &args);
+                state.advance()
+            }
+
+            /// Function with incrementing `ap`: `assert_[ap/fp]_add_imm_[ap/fp][_appp]`.
+            pub(crate) fn [<assert_ $dest _add_imm_ $op1 _appp>] (
+                memory: &mut Memory,
+                state: State,
+                args: InstructionArgs,
+            ) -> State {
+                let (dest, op1) = (stringify!($dest), stringify!($op1));
+                assign_or_assert_add_with_imm(memory, state, &[dest, op1], &args);
+                state.advance_and_increment_ap()
+            }
+        }
+    };
+}
+
 define_assert!(ap, ap, ap);
 define_assert!(ap, ap, fp);
 define_assert!(ap, fp, ap);
@@ -91,5 +144,9 @@ define_assert!(fp, ap, ap);
 define_assert!(fp, ap, fp);
 define_assert!(fp, fp, ap);
 define_assert!(fp, fp, fp);
+define_assert_with_imm!(ap, ap);
+define_assert_with_imm!(ap, fp);
+define_assert_with_imm!(fp, ap);
+define_assert_with_imm!(fp, fp);
 
 // TODO: add tests.
