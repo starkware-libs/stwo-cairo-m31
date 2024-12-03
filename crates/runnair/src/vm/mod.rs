@@ -2,6 +2,7 @@ pub mod add_ap;
 pub mod assert;
 pub mod call;
 pub mod jmp;
+pub mod jnz;
 pub mod operand;
 
 use stwo_prover::core::fields::m31::M31;
@@ -10,6 +11,7 @@ use self::add_ap::*;
 use self::assert::*;
 use self::call::*;
 use self::jmp::*;
+use self::jnz::*;
 use crate::memory::{MaybeRelocatableAddr, Memory};
 
 #[derive(Clone, Copy, Debug)]
@@ -211,18 +213,18 @@ pub fn opcode_to_instruction(opcode: usize) -> fn(&mut Memory, State, Instructio
         156 => jmp_rel_mul_imm_ap_appp,
         157 => jmp_rel_mul_imm_fp,
         158 => jmp_rel_mul_imm_fp_appp,
-        159 => unimplemented!(), // jnz_ap_ap,
-        160 => unimplemented!(), // jnz_ap_ap_appp,
-        161 => unimplemented!(), // jnz_ap_fp,
-        162 => unimplemented!(), // jnz_ap_fp_appp,
-        163 => unimplemented!(), // jnz_fp_ap,
-        164 => unimplemented!(), // jnz_fp_ap_appp,
-        165 => unimplemented!(), // jnz_fp_fp,
-        166 => unimplemented!(), // jnz_fp_fp_appp,
-        167 => unimplemented!(), // jnz_imm_ap,
-        168 => unimplemented!(), // jnz_imm_ap_appp,
-        169 => unimplemented!(), // jnz_imm_fp,
-        170 => unimplemented!(), // jnz_imm_fp_appp,
+        159 => jnz_ap_ap,
+        160 => jnz_ap_ap_appp,
+        161 => jnz_ap_fp,
+        162 => jnz_ap_fp_appp,
+        163 => jnz_fp_ap,
+        164 => jnz_fp_ap_appp,
+        165 => jnz_fp_fp,
+        166 => jnz_fp_fp_appp,
+        167 => jnz_imm_ap,
+        168 => jnz_imm_ap_appp,
+        169 => jnz_imm_fp,
+        170 => jnz_imm_fp_appp,
         171 => ret,
         _ => panic!("Unknown opcode: {}.", opcode),
     }

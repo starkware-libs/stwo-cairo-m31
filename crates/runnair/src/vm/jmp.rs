@@ -21,7 +21,7 @@ fn jmp_rel_appp(state: State, operand: M31) -> State {
     }
 }
 
-fn jmp_abs(state: State, operand: M31) -> State {
+pub(crate) fn jmp_abs(state: State, operand: M31) -> State {
     State {
         ap: state.ap,
         fp: state.fp,
@@ -29,7 +29,7 @@ fn jmp_abs(state: State, operand: M31) -> State {
     }
 }
 
-fn jmp_abs_appp(state: State, operand: M31) -> State {
+pub(crate) fn jmp_abs_appp(state: State, operand: M31) -> State {
     State {
         ap: state.ap + M31(1),
         fp: state.fp,

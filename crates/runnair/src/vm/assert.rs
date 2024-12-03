@@ -1,6 +1,7 @@
 use paste::paste;
+use stwo_prover::core::fields::m31::M31;
 
-use crate::memory::{MaybeRelocatableAddr, Memory};
+use crate::memory::Memory;
 use crate::vm::{resolve_addresses, InstructionArgs, State};
 
 fn assign_or_assert_add(memory: &mut Memory, state: State, bases: &[&str; 3], args: &[M31; 3]) {
