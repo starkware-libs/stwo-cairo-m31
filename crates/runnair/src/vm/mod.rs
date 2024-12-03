@@ -1,6 +1,7 @@
 pub mod add_ap;
 pub mod assert;
 pub mod call;
+pub mod deref;
 pub mod jmp;
 pub mod jnz;
 pub mod operand;
@@ -10,6 +11,7 @@ use stwo_prover::core::fields::m31::M31;
 use self::add_ap::*;
 use self::assert::*;
 use self::call::*;
+use self::deref::*;
 use self::jmp::*;
 use self::jnz::*;
 use crate::memory::{MaybeRelocatableAddr, Memory};
@@ -83,14 +85,14 @@ pub fn opcode_to_instruction(opcode: usize) -> fn(&mut Memory, State, Instructio
         26 => assert_ap_add_imm_ap_appp,
         27 => assert_ap_add_imm_fp,
         28 => assert_ap_add_imm_fp_appp,
-        29 => unimplemented!(), // assert_ap_deref_ap,
-        30 => unimplemented!(), // assert_ap_deref_ap_appp,
-        31 => unimplemented!(), // assert_ap_deref_fp,
-        32 => unimplemented!(), // assert_ap_deref_fp_appp,
-        33 => unimplemented!(), // assert_ap_double_deref_ap,
-        34 => unimplemented!(), // assert_ap_double_deref_ap_appp,
-        35 => unimplemented!(), // assert_ap_double_deref_fp,
-        36 => unimplemented!(), // assert_ap_double_deref_fp_appp,
+        29 => assert_ap_deref_ap,
+        30 => assert_ap_deref_ap_appp,
+        31 => assert_ap_deref_fp,
+        32 => assert_ap_deref_fp_appp,
+        33 => assert_ap_double_deref_ap,
+        34 => assert_ap_double_deref_ap_appp,
+        35 => assert_ap_double_deref_fp,
+        36 => assert_ap_double_deref_fp_appp,
         37 => unimplemented!(), // assert_ap_imm,
         38 => unimplemented!(), // assert_ap_imm_appp,
         39 => unimplemented!(), // assert_ap_mul_ap_ap,
@@ -117,14 +119,14 @@ pub fn opcode_to_instruction(opcode: usize) -> fn(&mut Memory, State, Instructio
         60 => assert_fp_add_imm_ap_appp,
         61 => assert_fp_add_imm_fp,
         62 => assert_fp_add_imm_fp_appp,
-        63 => unimplemented!(), // assert_fp_deref_ap,
-        64 => unimplemented!(), // assert_fp_deref_ap_appp,
-        65 => unimplemented!(), // assert_fp_deref_fp,
-        66 => unimplemented!(), // assert_fp_deref_fp_appp,
-        67 => unimplemented!(), // assert_fp_double_deref_ap,
-        68 => unimplemented!(), // assert_fp_double_deref_ap_appp,
-        69 => unimplemented!(), // assert_fp_double_deref_fp,
-        70 => unimplemented!(), // assert_fp_double_deref_fp_appp,
+        63 => assert_fp_deref_ap,
+        64 => assert_fp_deref_ap_appp,
+        65 => assert_fp_deref_fp,
+        66 => assert_fp_deref_fp_appp,
+        67 => assert_fp_double_deref_ap,
+        68 => assert_fp_double_deref_ap_appp,
+        69 => assert_fp_double_deref_fp,
+        70 => assert_fp_double_deref_fp_appp,
         71 => unimplemented!(), // assert_fp_imm,
         72 => unimplemented!(), // assert_fp_imm_appp,
         73 => unimplemented!(), // assert_fp_mul_ap_ap,
