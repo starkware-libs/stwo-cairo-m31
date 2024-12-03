@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, Div, Mul, Sub};
 
 use num_traits::Zero;
 use stwo_prover::core::fields::m31::M31;
@@ -58,6 +58,12 @@ impl<T: From<M31>> From<Relocatable> for MaybeRelocatable<T> {
 impl<T: From<M31>> From<T> for MaybeRelocatable<T> {
     fn from(value: T) -> Self {
         MaybeRelocatable::Absolute(value)
+    }
+}
+
+impl From<M31> for MaybeRelocatable<QM31> {
+    fn from(value: M31) -> Self {
+        MaybeRelocatable::Absolute(value.into())
     }
 }
 
@@ -287,11 +293,8 @@ impl<T: From<M31> + Mul<S, Output = S>, S: From<M31>> Mul<MaybeRelocatable<S>>
     type Output = MaybeRelocatable<S>;
     fn mul(self, rhs: MaybeRelocatable<S>) -> Self::Output {
         match (self, rhs) {
-            (MaybeRelocatable::Relocatable(_), _) => {
-                panic!("Cannot multiply a relocatable.")
-            }
-            (_, MaybeRelocatable::Relocatable(_)) => {
-                panic!("Cannot multiply a relocatable.")
+            (MaybeRelocatable::Relocatable(_), _) | (_, MaybeRelocatable::Relocatable(_)) => {
+                panic!("Multiplication involving relocatable values is not possible.")
             }
             (MaybeRelocatable::Absolute(lhs), MaybeRelocatable::Absolute(rhs)) => {
                 MaybeRelocatable::Absolute(lhs * rhs)
@@ -306,6 +309,32 @@ impl<T: From<M31> + Mul<M31, Output = T>> Mul<M31> for MaybeRelocatable<T> {
         match self {
             MaybeRelocatable::Relocatable(_) => panic!("Cannot multiply a relocatable."),
             MaybeRelocatable::Absolute(lhs) => MaybeRelocatable::Absolute(lhs * rhs),
+        }
+    }
+}
+
+impl<T: From<M31> + Div<S, Output = S>, S: From<M31>> Div<MaybeRelocatable<S>>
+    for MaybeRelocatable<T>
+{
+    type Output = MaybeRelocatable<S>;
+    fn div(self, rhs: MaybeRelocatable<S>) -> Self::Output {
+        match (self, rhs) {
+            (MaybeRelocatable::Relocatable(_), _) | (_, MaybeRelocatable::Relocatable(_)) => {
+                panic!("Division involving relocatable values is not possible.")
+            }
+            (MaybeRelocatable::Absolute(lhs), MaybeRelocatable::Absolute(rhs)) => {
+                MaybeRelocatable::Absolute(lhs / rhs)
+            }
+        }
+    }
+}
+
+impl<T: From<M31> + Div<M31, Output = T>> Div<M31> for MaybeRelocatable<T> {
+    type Output = Self;
+    fn div(self, rhs: M31) -> Self {
+        match self {
+            MaybeRelocatable::Relocatable(_) => panic!("Cannot divide a relocatable."),
+            MaybeRelocatable::Absolute(lhs) => MaybeRelocatable::Absolute(lhs / rhs),
         }
     }
 }
