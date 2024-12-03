@@ -25,27 +25,29 @@ fn resolve_addresses<const N: usize>(
     })
 }
 
-fn assign_or_assert_add_on_memory(
-    memory: &mut Memory,
-    dest: MaybeRelocatableAddr,
-    op1: MaybeRelocatableAddr,
-    op2: MaybeRelocatableAddr,
-) {
-    match (memory.get(dest), memory.get(op1), memory.get(op2)) {
-        (Some(dest_val), Some(op0_val), Some(op1_val)) => {
-            assert_eq!(dest_val, op0_val + op1_val, "Assertion failed.");
+fn assign_or_assert_add(memory: &mut Memory, state: State, bases: &[&str; 3], args: &[M31; 3]) {
+    let [dest, op1, op2] = bases;
+    let [dest_addr, op1_addr, op2_addr] = resolve_addresses(state, &[dest, op1, op2], args);
+
+    match (
+        memory.get(dest_addr),
+        memory.get(op1_addr),
+        memory.get(op2_addr),
+    ) {
+        (Some(dest_val), Some(op1_val), Some(op2_val)) => {
+            assert_eq!(dest_val, op1_val + op2_val, "Assertion failed.");
         }
-        (None, Some(op0_val), Some(op1_val)) => {
-            let deduced_value = op0_val + op1_val;
-            memory.insert(dest, deduced_value);
+        (None, Some(op1_val), Some(op2_val)) => {
+            let deduced_value = op1_val + op2_val;
+            memory.insert(dest_addr, deduced_value);
         }
-        (Some(dest_val), None, Some(op1_val)) => {
+        (Some(dest_val), None, Some(op2_val)) => {
+            let deduced_value = dest_val - op2_val;
+            memory.insert(op2_addr, deduced_value);
+        }
+        (Some(dest_val), Some(op1_val), None) => {
             let deduced_value = dest_val - op1_val;
-            memory.insert(op1, deduced_value);
-        }
-        (Some(dest_val), Some(op0_val), None) => {
-            let deduced_value = dest_val - op0_val;
-            memory.insert(op2, deduced_value);
+            memory.insert(op2_addr, deduced_value);
         }
         _ => panic!("Cannot deduce more than one operand"),
     };
@@ -63,10 +65,7 @@ macro_rules! define_assert {
                 args: InstructionArgs,
             ) -> State {
                 let (dest, op1, op2) = (stringify!($dest), stringify!($op1), stringify!($op2));
-
-                let addresses = resolve_addresses(state, &[dest, op1, op2], &args);
-                assign_or_assert_add_on_memory(memory, addresses[0], addresses[1], addresses[2]);
-
+                assign_or_assert_add(memory, state, &[dest, op1, op2], &args);
                 state.advance()
             }
 
@@ -77,10 +76,7 @@ macro_rules! define_assert {
                 args: InstructionArgs,
             ) -> State {
                 let (dest, op1, op2) = (stringify!($dest), stringify!($op1), stringify!($op2));
-
-                let addresses = resolve_addresses(state, &[dest, op1, op2], &args);
-                assign_or_assert_add_on_memory(memory, addresses[0], addresses[1], addresses[2]);
-
+                assign_or_assert_add(memory, state, &[dest, op1, op2], &args);
                 state.advance_and_increment_ap()
             }
         }
