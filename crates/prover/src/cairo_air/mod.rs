@@ -130,15 +130,11 @@ impl CairoComponents {
     }
 
     pub fn provers(&self) -> Vec<&dyn ComponentProver<SimdBackend>> {
-        let mut vec: Vec<&dyn ComponentProver<SimdBackend>> = vec![];
-        vec.push(&self.memory_id_to_value);
-        vec
+        vec![&self.memory_id_to_value]
     }
 
     pub fn components(&self) -> Vec<&dyn Component> {
-        let mut vec: Vec<&dyn Component> = vec![];
-        vec.push(&self.memory_id_to_value);
-        vec
+        vec![&self.memory_id_to_value]
     }
 }
 
