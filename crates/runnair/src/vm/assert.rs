@@ -1,29 +1,7 @@
 use paste::paste;
-use stwo_prover::core::fields::m31::M31;
 
 use crate::memory::{MaybeRelocatableAddr, Memory};
-use crate::vm::{InstructionArgs, State};
-
-fn resolve_addresses<const N: usize>(
-    state: State,
-    bases: &[&str; N],
-    offsets: &[M31; N],
-) -> [MaybeRelocatableAddr; N] {
-    assert!(
-        bases.len() <= 3,
-        "The number of bases and offsets should not exceed 3"
-    );
-
-    std::array::from_fn(|i| {
-        let base = bases[i];
-        let base_address = match base {
-            "ap" => state.ap,
-            "fp" => state.fp,
-            _ => panic!("Invalid base: {}", base),
-        };
-        MaybeRelocatableAddr::Absolute(base_address + offsets[i])
-    })
-}
+use crate::vm::{resolve_addresses, InstructionArgs, State};
 
 fn assign_or_assert_add(memory: &mut Memory, state: State, bases: &[&str; 3], args: &[M31; 3]) {
     let [dest, op1, op2] = bases;

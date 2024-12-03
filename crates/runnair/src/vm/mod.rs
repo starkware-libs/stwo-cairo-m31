@@ -1,5 +1,6 @@
 pub mod add_ap;
 pub mod assert;
+pub mod call;
 pub mod jmp;
 pub mod operand;
 
@@ -7,8 +8,9 @@ use stwo_prover::core::fields::m31::M31;
 
 use self::add_ap::*;
 use self::assert::*;
+use self::call::*;
 use self::jmp::*;
-use crate::memory::Memory;
+use crate::memory::{MaybeRelocatableAddr, Memory};
 
 #[derive(Clone, Copy, Debug)]
 pub struct State {
@@ -135,12 +137,12 @@ pub fn opcode_to_instruction(opcode: usize) -> fn(&mut Memory, State, Instructio
         82 => unimplemented!(), // assert_fp_mul_imm_ap_appp,
         83 => unimplemented!(), // assert_fp_mul_imm_fp,
         84 => unimplemented!(), // assert_fp_mul_imm_fp_appp,
-        85 => unimplemented!(), // call_abs_ap,
-        86 => unimplemented!(), // call_abs_fp,
-        87 => unimplemented!(), // call_abs_imm,
-        88 => unimplemented!(), // call_rel_ap,
-        89 => unimplemented!(), // call_rel_fp,
-        90 => unimplemented!(), // call_rel_imm,
+        85 => call_abs_ap,
+        86 => call_abs_fp,
+        87 => call_abs_imm,
+        88 => call_rel_ap,
+        89 => call_rel_fp,
+        90 => call_rel_imm,
         91 => jmp_abs_add_ap_ap,
         92 => jmp_abs_add_ap_ap_appp,
         93 => jmp_abs_add_ap_fp,
@@ -221,7 +223,30 @@ pub fn opcode_to_instruction(opcode: usize) -> fn(&mut Memory, State, Instructio
         168 => unimplemented!(), // jnz_imm_ap_appp,
         169 => unimplemented!(), // jnz_imm_fp,
         170 => unimplemented!(), // jnz_imm_fp_appp,
-        171 => unimplemented!(), // ret,
+        171 => ret,
         _ => panic!("Unknown opcode: {}.", opcode),
     }
+}
+
+// Utils.
+
+pub(crate) fn resolve_addresses<const N: usize>(
+    state: State,
+    bases: &[&str; N],
+    offsets: &[M31; N],
+) -> [MaybeRelocatableAddr; N] {
+    assert!(
+        bases.len() <= 3,
+        "The number of bases and offsets should not exceed 3"
+    );
+
+    std::array::from_fn(|i| {
+        let base = bases[i];
+        let base_address = match base {
+            "ap" => state.ap,
+            "fp" => state.fp,
+            _ => panic!("Invalid base: {}", base),
+        };
+        MaybeRelocatableAddr::Absolute(base_address + offsets[i])
+    })
 }
