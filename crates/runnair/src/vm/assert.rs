@@ -1,7 +1,7 @@
 use paste::paste;
 use stwo_prover::core::fields::m31::M31;
 
-use crate::memory::Memory;
+use crate::memory::{MaybeRelocatableValue, Memory};
 use crate::vm::{resolve_addresses, InstructionArgs, State};
 
 fn assign_or_assert_add(memory: &mut Memory, state: State, bases: &[&str; 3], args: &[M31; 3]) {
@@ -115,6 +115,43 @@ macro_rules! define_assert_with_imm {
     };
 }
 
+fn assign_or_assert_imm(memory: &mut Memory, state: State, base: &str, offsets: &[M31; 2]) {
+    let [dest_addr] = resolve_addresses(state, &[base], &[offsets[0]]);
+    let immediate = MaybeRelocatableValue::Absolute(offsets[1].into());
+
+    if let Some(dest_val) = memory.get(dest_addr) {
+        assert_eq!(dest_val, immediate, "Assertion failed.");
+    } else {
+        memory.insert(dest_addr, immediate);
+    };
+}
+
+macro_rules! define_assert_imm {
+    ($dest:ident) => {
+        paste! {
+            /// Assert immediate without incrementing `ap`: `assert_[ap/fp]_imm`.
+            pub(crate) fn [<assert_ $dest _imm>] (
+                memory: &mut Memory,
+                state: State,
+                args: InstructionArgs,
+            ) -> State {
+                assign_or_assert_imm(memory, state, stringify!($dest), &[args[0], args[1]]);
+                state.advance()
+            }
+
+            /// Assert immediate with incrementing `ap`: `assert_[ap/fp]_imm_appp`.
+            pub(crate) fn [<assert_ $dest _imm_appp>] (
+                memory: &mut Memory,
+                state: State,
+                args: InstructionArgs,
+            ) -> State {
+                assign_or_assert_imm(memory, state, stringify!($dest), &[args[0], args[1]]);
+                state.advance_and_increment_ap()
+            }
+        }
+    };
+}
+
 define_assert!(ap, ap, ap);
 define_assert!(ap, ap, fp);
 define_assert!(ap, fp, ap);
@@ -127,5 +164,7 @@ define_assert_with_imm!(ap, ap);
 define_assert_with_imm!(ap, fp);
 define_assert_with_imm!(fp, ap);
 define_assert_with_imm!(fp, fp);
+define_assert_imm!(ap);
+define_assert_imm!(fp);
 
 // TODO: add tests.
