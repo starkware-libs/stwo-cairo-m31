@@ -1,10 +1,45 @@
 use paste::paste;
 use stwo_prover::core::fields::m31::M31;
 
-use crate::memory::Memory;
+use crate::memory::{MaybeRelocatableValue, Memory};
 use crate::vm::{resolve_addresses, InstructionArgs, State};
 
-fn assign_or_assert_add(memory: &mut Memory, state: State, bases: &[&str; 3], args: &[M31; 3]) {
+enum Operation {
+    Add,
+    Mul,
+}
+
+impl Operation {
+    fn apply(
+        self,
+        x: MaybeRelocatableValue,
+        y: impl Into<MaybeRelocatableValue>,
+    ) -> MaybeRelocatableValue {
+        match self {
+            Operation::Add => x + y.into(),
+            Operation::Mul => x * y.into(),
+        }
+    }
+
+    fn deduce(
+        self,
+        x: MaybeRelocatableValue,
+        y: impl Into<MaybeRelocatableValue>,
+    ) -> MaybeRelocatableValue {
+        match self {
+            Operation::Add => x - y.into(),
+            Operation::Mul => x / y.into(),
+        }
+    }
+}
+
+fn assign_or_assert_operation(
+    memory: &mut Memory,
+    state: State,
+    operation: Operation,
+    bases: &[&str; 3],
+    args: &[M31; 3],
+) {
     let [dest, op1, op2] = bases;
     let [dest_addr, op1_addr, op2_addr] = resolve_addresses(state, &[dest, op1, op2], args);
 
@@ -14,19 +49,20 @@ fn assign_or_assert_add(memory: &mut Memory, state: State, bases: &[&str; 3], ar
         memory.get(op2_addr),
     ) {
         (Some(dest_val), Some(op1_val), Some(op2_val)) => {
-            assert_eq!(dest_val, op1_val + op2_val, "Assertion failed.");
+            assert_eq!(
+                dest_val,
+                operation.apply(op1_val, op2_val),
+                "Assertion failed."
+            );
         }
         (None, Some(op1_val), Some(op2_val)) => {
-            let deduced_value = op1_val + op2_val;
-            memory.insert(dest_addr, deduced_value);
+            memory.insert(dest_addr, operation.apply(op1_val, op2_val));
         }
         (Some(dest_val), None, Some(op2_val)) => {
-            let deduced_value = dest_val - op2_val;
-            memory.insert(op2_addr, deduced_value);
+            memory.insert(op2_addr, operation.deduce(dest_val, op2_val));
         }
         (Some(dest_val), Some(op1_val), None) => {
-            let deduced_value = dest_val - op1_val;
-            memory.insert(op2_addr, deduced_value);
+            memory.insert(op2_addr, operation.deduce(dest_val, op1_val));
         }
         _ => panic!("Cannot deduce more than one operand"),
     };
@@ -36,34 +72,57 @@ fn assign_or_assert_add(memory: &mut Memory, state: State, bases: &[&str; 3], ar
 macro_rules! define_assert {
     ($dest:ident, $op1:ident, $op2:ident) => {
         paste! {
-            /// Function without incrementing `ap`: `assert_[ap/fp]_add_[ap/fp]_[ap/fp]`.
+            /// Assert add without incrementing `ap`: `assert_[ap/fp]_add_[ap/fp]_[ap/fp]`.
             pub(crate) fn [<assert_ $dest _add_ $op1 _ $op2>] (
                 memory: &mut Memory,
                 state: State,
                 args: InstructionArgs,
             ) -> State {
                 let (dest, op1, op2) = (stringify!($dest), stringify!($op1), stringify!($op2));
-                assign_or_assert_add(memory, state, &[dest, op1, op2], &args);
+                assign_or_assert_operation(memory, state, Operation::Add, &[dest, op1, op2], &args);
                 state.advance()
             }
 
-            /// Function with incrementing `ap`: `assert_[ap/fp]_add_[ap/fp]_[ap/fp][_appp]`.
+            /// Assert add with incrementing `ap`: `assert_[ap/fp]_add_[ap/fp]_[ap/fp][_appp]`.
             pub(crate) fn [<assert_ $dest _add_ $op1 _ $op2 _appp>] (
                 memory: &mut Memory,
                 state: State,
                 args: InstructionArgs,
             ) -> State {
                 let (dest, op1, op2) = (stringify!($dest), stringify!($op1), stringify!($op2));
-                assign_or_assert_add(memory, state, &[dest, op1, op2], &args);
+                assign_or_assert_operation(memory, state, Operation::Add, &[dest, op1, op2], &args);
+                state.advance_and_increment_ap()
+            }
+
+            /// Assert mul without incrementing `ap`: `assert_[ap/fp]_mul_[ap/fp]_[ap/fp]`.
+            pub(crate) fn [<assert_ $dest _mul_ $op1 _ $op2>] (
+                memory: &mut Memory,
+                state: State,
+                args: InstructionArgs,
+            ) -> State {
+                let (dest, op1, op2) = (stringify!($dest), stringify!($op1), stringify!($op2));
+                assign_or_assert_operation(memory, state, Operation::Mul, &[dest, op1, op2], &args);
+                state.advance()
+            }
+
+            /// Assert mul with incrementing `ap`: `assert_[ap/fp]_mul_[ap/fp]_[ap/fp][_appp]`.
+            pub(crate) fn [<assert_ $dest _mul_ $op1 _ $op2 _appp>] (
+                memory: &mut Memory,
+                state: State,
+                args: InstructionArgs,
+            ) -> State {
+                let (dest, op1, op2) = (stringify!($dest), stringify!($op1), stringify!($op2));
+                assign_or_assert_operation(memory, state, Operation::Mul, &[dest, op1, op2], &args);
                 state.advance_and_increment_ap()
             }
         }
     };
 }
 
-fn assign_or_assert_add_with_imm(
+fn assign_or_assert_operation_with_imm(
     memory: &mut Memory,
     state: State,
+    operation: Operation,
     bases: &[&str; 2],
     args: &[M31; 3],
 ) {
@@ -73,15 +132,17 @@ fn assign_or_assert_add_with_imm(
 
     match (memory.get(dest_addr), memory.get(op1_addr)) {
         (Some(dest_val), Some(op1_val)) => {
-            assert_eq!(dest_val, op1_val + immediate, "Assertion failed.");
+            assert_eq!(
+                dest_val,
+                operation.apply(op1_val, immediate),
+                "Assertion failed."
+            );
         }
         (None, Some(op1_val)) => {
-            let deduced_value = op1_val + immediate;
-            memory.insert(dest_addr, deduced_value);
+            memory.insert(dest_addr, operation.deduce(op1_val, immediate));
         }
         (Some(dest_val), None) => {
-            let deduced_value = dest_val - immediate;
-            memory.insert(op1_addr, deduced_value);
+            memory.insert(op1_addr, operation.deduce(dest_val, immediate));
         }
         _ => panic!("Cannot deduce more than one operand"),
     };
@@ -90,25 +151,71 @@ fn assign_or_assert_add_with_imm(
 macro_rules! define_assert_with_imm {
     ($dest:ident, $op1:ident) => {
         paste! {
-            /// Function without incrementing `ap`: `assert_[ap/fp]_add_imm_[ap/fp]`.
+            /// Assert add without incrementing `ap`: `assert_[ap/fp]_add_imm_[ap/fp]`.
             pub(crate) fn [<assert_ $dest _add_imm_ $op1>] (
                 memory: &mut Memory,
                 state: State,
                 args: InstructionArgs,
             ) -> State {
                 let (dest, op1) = (stringify!($dest), stringify!($op1));
-                assign_or_assert_add_with_imm(memory, state, &[dest, op1], &args);
+                assign_or_assert_operation_with_imm(
+                    memory,
+                    state,
+                    Operation::Add,
+                    &[dest, op1],
+                    &args,
+                );
                 state.advance()
             }
 
-            /// Function with incrementing `ap`: `assert_[ap/fp]_add_imm_[ap/fp][_appp]`.
+            /// Assert add with incrementing `ap`: `assert_[ap/fp]_add_imm_[ap/fp][_appp]`.
             pub(crate) fn [<assert_ $dest _add_imm_ $op1 _appp>] (
                 memory: &mut Memory,
                 state: State,
                 args: InstructionArgs,
             ) -> State {
                 let (dest, op1) = (stringify!($dest), stringify!($op1));
-                assign_or_assert_add_with_imm(memory, state, &[dest, op1], &args);
+                assign_or_assert_operation_with_imm(
+                    memory,
+                    state,
+                    Operation::Add,
+                    &[dest, op1],
+                    &args,
+                );
+                state.advance_and_increment_ap()
+            }
+
+            /// Assert mul without incrementing `ap`: `assert_[ap/fp]_mul_imm_[ap/fp]`.
+            pub(crate) fn [<assert_ $dest _mul_imm_ $op1>] (
+                memory: &mut Memory,
+                state: State,
+                args: InstructionArgs,
+            ) -> State {
+                let (dest, op1) = (stringify!($dest), stringify!($op1));
+                assign_or_assert_operation_with_imm(
+                    memory,
+                    state,
+                    Operation::Mul,
+                    &[dest, op1],
+                    &args,
+                );
+                state.advance()
+            }
+
+            /// Assert mul with incrementing `ap`: `assert_[ap/fp]_mul_imm_[ap/fp][_appp]`.
+            pub(crate) fn [<assert_ $dest _mul_imm_ $op1 _appp>] (
+                memory: &mut Memory,
+                state: State,
+                args: InstructionArgs,
+            ) -> State {
+                let (dest, op1) = (stringify!($dest), stringify!($op1));
+                assign_or_assert_operation_with_imm(
+                    memory,
+                    state,
+                    Operation::Mul,
+                    &[dest, op1],
+                    &args,
+                );
                 state.advance_and_increment_ap()
             }
         }

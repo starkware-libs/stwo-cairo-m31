@@ -78,7 +78,7 @@ fn assign_or_assert_double_deref(
     let [dest_addr, inner_addr] =
         resolve_addresses(state, &[dest, inner_offset], &[args[0], args[1]]);
     let Some(outer_addr_base) = memory.get(inner_addr) else {
-        panic!("Cannot deduce more than one operand");
+        panic!("Cannot deduce inner address of a double dereference");
     };
     let outer_addr = outer_addr_base + args[2];
     let outer_val = memory.get(outer_addr);

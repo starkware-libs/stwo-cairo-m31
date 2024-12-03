@@ -40,6 +40,7 @@ pub(crate) fn jmp_abs_appp(state: State, operand: M31) -> State {
 macro_rules! jmp_with_operand {
     ($operand:ident) => {
         paste! {
+            /// Relative jump without incrementing `ap`: `jmp_rel_[ap/fp]`.
             pub(crate) fn [<jmp_rel_ $operand>](
                 memory: &mut Memory,
                 state: State,
@@ -54,6 +55,7 @@ macro_rules! jmp_with_operand {
                 }
             }
 
+            /// Relative jump with incrementing `ap`: `jmp_rel_[ap/fp]_appp`.
             pub(crate) fn [<jmp_rel_ $operand _appp>](
                 memory: &mut Memory,
                 state: State,
@@ -68,6 +70,7 @@ macro_rules! jmp_with_operand {
                 }
             }
 
+            /// Absolute jump without incrementing `ap`: `jmp_abs_[ap/fp]`.
             pub(crate) fn [<jmp_abs_ $operand>](
                 memory: &mut Memory,
                 state: State,
@@ -82,6 +85,7 @@ macro_rules! jmp_with_operand {
                 }
             }
 
+            /// Absolute jump with incrementing `ap`: `jmp_abs_[ap/fp]_appp`.
             pub(crate) fn [<jmp_abs_ $operand _appp>](
                 memory: &mut Memory,
                 state: State,
