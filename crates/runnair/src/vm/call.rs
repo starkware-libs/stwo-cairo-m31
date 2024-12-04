@@ -1,37 +1,37 @@
 use paste::paste;
 use stwo_prover::core::fields::m31::M31;
 
-use crate::memory::relocatable::{assert_and_project, MaybeRelocatable};
-use crate::memory::Memory;
+use crate::memory::relocatable::assert_and_project;
+use crate::memory::{MaybeRelocatableAddr, Memory};
 use crate::vm::{resolve_addresses, InstructionArgs, State};
 
-fn resolve_destination_offset(memory: &Memory, state: State, base: &str, offset: M31) -> M31 {
+fn resolve_destination_offset(
+    memory: &Memory,
+    state: State,
+    base: &str,
+    offset: M31,
+) -> MaybeRelocatableAddr {
     let [offset_address] = resolve_addresses(state, &[base], &[offset]);
     let Some(destination_offset) = memory.get(offset_address) else {
         panic!("Destination offset cannot be deduced.")
     };
 
-    let MaybeRelocatable::Absolute(destination_offset) = assert_and_project(destination_offset)
-    else {
-        panic!("Operand must be an absolute value.")
-    };
-
-    destination_offset
+    assert_and_project(destination_offset)
 }
 
-fn call_rel(state: State, operand: M31) -> State {
+fn call_rel(state: State, operand: impl Into<MaybeRelocatableAddr>) -> State {
     State {
         ap: state.ap + M31(2),
         fp: state.ap,
-        pc: state.pc + operand,
+        pc: state.pc + operand.into(),
     }
 }
 
-fn call_abs(state: State, operand: M31) -> State {
+fn call_abs(state: State, operand: impl Into<MaybeRelocatableAddr>) -> State {
     State {
         ap: state.ap + M31(2),
         fp: state.ap,
-        pc: operand,
+        pc: operand.into(),
     }
 }
 
@@ -82,17 +82,9 @@ pub(crate) fn ret(memory: &mut Memory, state: State, _args: InstructionArgs) -> 
         panic!("Previous `pc` cannot be deduced.")
     };
 
-    let MaybeRelocatable::Absolute(fp) = assert_and_project(fp) else {
-        panic!("Previous `fp` must be an absolute value.")
-    };
-
-    let MaybeRelocatable::Absolute(pc) = assert_and_project(pc) else {
-        panic!("Previous `pc` must be an absolute value.")
-    };
-
     State {
         ap: state.ap,
-        fp,
-        pc,
+        fp: assert_and_project(fp),
+        pc: assert_and_project(pc),
     }
 }
