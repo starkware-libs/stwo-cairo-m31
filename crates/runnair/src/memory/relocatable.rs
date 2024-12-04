@@ -99,10 +99,21 @@ impl Add<MaybeRelocatable<M31>> for MaybeRelocatable<M31> {
 }
 
 /// Assert that the input is in the base field and return the projection to the base field.
-pub fn assert_and_project(x: QM31) -> M31 {
+fn assert_and_project_on_felt(x: QM31) -> M31 {
     assert!(x.1.is_zero());
     assert!(x.0 .1.is_zero());
     x.0 .0
+}
+
+// TODO: change to `TryFrom` if we add error handling.
+/// For an absolute value, assert that the input is in the base field and return the projection to
+/// the base field.
+/// For a relocatable value, simply returns as-is.
+pub(crate) fn assert_and_project(x: MaybeRelocatable<QM31>) -> MaybeRelocatable<M31> {
+    match x {
+        MaybeRelocatable::Relocatable(x) => MaybeRelocatable::<M31>::Relocatable(x),
+        MaybeRelocatable::Absolute(x) => MaybeRelocatable::Absolute(assert_and_project_on_felt(x)),
+    }
 }
 
 impl Add<MaybeRelocatable<QM31>> for MaybeRelocatable<M31> {
@@ -110,7 +121,7 @@ impl Add<MaybeRelocatable<QM31>> for MaybeRelocatable<M31> {
     fn add(self, rhs: MaybeRelocatable<QM31>) -> MaybeRelocatable<QM31> {
         match (self, rhs) {
             (MaybeRelocatable::Relocatable(lhs), MaybeRelocatable::Absolute(rhs)) => {
-                MaybeRelocatable::Relocatable(lhs + assert_and_project(rhs))
+                MaybeRelocatable::Relocatable(lhs + assert_and_project_on_felt(rhs))
             }
             (MaybeRelocatable::Absolute(lhs), MaybeRelocatable::Relocatable(rhs)) => {
                 MaybeRelocatable::Relocatable(rhs + lhs)
@@ -133,7 +144,7 @@ impl Add<MaybeRelocatable<M31>> for MaybeRelocatable<QM31> {
                 MaybeRelocatable::Relocatable(lhs + rhs)
             }
             (MaybeRelocatable::Absolute(lhs), MaybeRelocatable::Relocatable(rhs)) => {
-                MaybeRelocatable::Relocatable(rhs + assert_and_project(lhs))
+                MaybeRelocatable::Relocatable(rhs + assert_and_project_on_felt(lhs))
             }
             (MaybeRelocatable::Relocatable(_), MaybeRelocatable::Relocatable(_)) => {
                 panic!("Cannot add two relocatables.")
@@ -150,10 +161,10 @@ impl Add<MaybeRelocatable<QM31>> for MaybeRelocatable<QM31> {
     fn add(self, rhs: Self) -> Self {
         match (self, rhs) {
             (MaybeRelocatable::Relocatable(lhs), MaybeRelocatable::Absolute(rhs)) => {
-                MaybeRelocatable::Relocatable(lhs + assert_and_project(rhs))
+                MaybeRelocatable::Relocatable(lhs + assert_and_project_on_felt(rhs))
             }
             (MaybeRelocatable::Absolute(lhs), MaybeRelocatable::Relocatable(rhs)) => {
-                MaybeRelocatable::Relocatable(rhs + assert_and_project(lhs))
+                MaybeRelocatable::Relocatable(rhs + assert_and_project_on_felt(lhs))
             }
             (MaybeRelocatable::Relocatable(_), MaybeRelocatable::Relocatable(_)) => {
                 panic!("Cannot add two relocatables.")
@@ -213,7 +224,7 @@ impl Sub<MaybeRelocatable<QM31>> for MaybeRelocatable<M31> {
     fn sub(self, rhs: MaybeRelocatable<QM31>) -> MaybeRelocatable<QM31> {
         match (self, rhs) {
             (MaybeRelocatable::Relocatable(lhs), MaybeRelocatable::Absolute(rhs)) => {
-                MaybeRelocatable::Relocatable(lhs - assert_and_project(rhs))
+                MaybeRelocatable::Relocatable(lhs - assert_and_project_on_felt(rhs))
             }
             (MaybeRelocatable::Absolute(_), MaybeRelocatable::Relocatable(_)) => {
                 panic!("Cannot subtract a relocatable from an absolute.")
@@ -259,7 +270,7 @@ impl Sub<MaybeRelocatable<QM31>> for MaybeRelocatable<QM31> {
     fn sub(self, rhs: Self) -> Self {
         match (self, rhs) {
             (MaybeRelocatable::Relocatable(lhs), MaybeRelocatable::Absolute(rhs)) => {
-                MaybeRelocatable::Relocatable(lhs - assert_and_project(rhs))
+                MaybeRelocatable::Relocatable(lhs - assert_and_project_on_felt(rhs))
             }
             (MaybeRelocatable::Absolute(_), MaybeRelocatable::Relocatable(_)) => {
                 panic!("Cannot subtract a relocatable from an absolute.")

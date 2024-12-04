@@ -5,25 +5,12 @@ use std::ops::Index;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
 
-use self::relocatable::{assert_and_project, MaybeRelocatable, RelocationTable};
+use self::relocatable::{MaybeRelocatable, RelocationTable};
 
 pub mod relocatable;
 
 pub type MaybeRelocatableAddr = MaybeRelocatable<M31>;
 pub type MaybeRelocatableValue = MaybeRelocatable<QM31>;
-
-impl From<MaybeRelocatableValue> for MaybeRelocatableAddr {
-    fn from(value: MaybeRelocatableValue) -> Self {
-        match value {
-            MaybeRelocatableValue::Relocatable(relocatable) => {
-                MaybeRelocatableAddr::Relocatable(relocatable)
-            }
-            MaybeRelocatableValue::Absolute(value) => {
-                MaybeRelocatable::Absolute(assert_and_project(value))
-            }
-        }
-    }
-}
 
 #[derive(Debug, Clone, Default)]
 pub struct Memory {

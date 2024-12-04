@@ -1,6 +1,7 @@
 use paste::paste;
 use stwo_prover::core::fields::m31::M31;
 
+use crate::memory::relocatable::assert_and_project;
 use crate::memory::{MaybeRelocatableAddr, MaybeRelocatableValue, Memory};
 use crate::vm::{resolve_addresses, InstructionArgs, State};
 
@@ -80,7 +81,7 @@ fn assign_or_assert_double_deref(
     let Some(outer_addr_base) = memory.get(inner_addr) else {
         panic!("Cannot deduce inner address of a double dereference");
     };
-    let outer_addr = outer_addr_base + args[2];
+    let outer_addr = assert_and_project(outer_addr_base + args[2]);
     let outer_val = memory.get(outer_addr);
 
     assign_or_assert_deref_on_memory(memory, dest_addr, outer_addr, outer_val)

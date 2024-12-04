@@ -7,11 +7,16 @@ use crate::vm::{resolve_addresses, InstructionArgs, State};
 
 fn resolve_destination_offset(memory: &Memory, state: State, base: &str, offset: M31) -> M31 {
     let [offset_address] = resolve_addresses(state, &[base], &[offset]);
-    let Some(MaybeRelocatable::Absolute(destination_offset)) = memory.get(offset_address) else {
-        panic!("Destination offset must be an absolute value.")
+    let Some(destination_offset) = memory.get(offset_address) else {
+        panic!("Destination offset cannot be deduced.")
     };
 
-    assert_and_project(destination_offset)
+    let MaybeRelocatable::Absolute(destination_offset) = assert_and_project(destination_offset)
+    else {
+        panic!("Operand must be an absolute value.")
+    };
+
+    destination_offset
 }
 
 fn call_rel(state: State, operand: M31) -> State {
@@ -69,17 +74,25 @@ define_call_imm!(abs);
 define_call_imm!(rel);
 
 pub(crate) fn ret(memory: &mut Memory, state: State, _args: InstructionArgs) -> State {
-    let Some(MaybeRelocatable::Absolute(fp)) = memory.get(state.fp - M31(2)) else {
+    let Some(fp) = memory.get(state.fp - M31(2)) else {
+        panic!("Previous `fp` cannot be deduced.")
+    };
+
+    let Some(pc) = memory.get(state.fp - M31(1)) else {
+        panic!("Previous `pc` cannot be deduced.")
+    };
+
+    let MaybeRelocatable::Absolute(fp) = assert_and_project(fp) else {
         panic!("Previous `fp` must be an absolute value.")
     };
 
-    let Some(MaybeRelocatable::Absolute(pc)) = memory.get(state.fp - M31(1)) else {
+    let MaybeRelocatable::Absolute(pc) = assert_and_project(pc) else {
         panic!("Previous `pc` must be an absolute value.")
     };
 
     State {
         ap: state.ap,
-        fp: assert_and_project(fp),
-        pc: assert_and_project(pc),
+        fp,
+        pc,
     }
 }

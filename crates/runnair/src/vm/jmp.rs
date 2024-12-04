@@ -1,11 +1,15 @@
 use paste::paste;
 use stwo_prover::core::fields::m31::M31;
 
-use crate::memory::relocatable::assert_and_project;
-use crate::memory::{MaybeRelocatableValue, Memory};
+use crate::memory::relocatable::{assert_and_project, MaybeRelocatable};
+use crate::memory::{MaybeRelocatableAddr, Memory};
 use crate::vm::{InstructionArgs, State};
 
-fn jmp_rel(state: State, operand: M31) -> State {
+fn jmp_rel(state: State, operand: MaybeRelocatableAddr) -> State {
+    let MaybeRelocatable::Absolute(operand) = operand else {
+        panic!("Operand must be an absolute value.")
+    };
+
     State {
         ap: state.ap,
         fp: state.fp,
@@ -13,7 +17,11 @@ fn jmp_rel(state: State, operand: M31) -> State {
     }
 }
 
-fn jmp_rel_appp(state: State, operand: M31) -> State {
+fn jmp_rel_appp(state: State, operand: MaybeRelocatableAddr) -> State {
+    let MaybeRelocatable::Absolute(operand) = operand else {
+        panic!("Operand must be an absolute value.")
+    };
+
     State {
         ap: state.ap + M31(1),
         fp: state.fp,
@@ -21,7 +29,11 @@ fn jmp_rel_appp(state: State, operand: M31) -> State {
     }
 }
 
-pub(crate) fn jmp_abs(state: State, operand: M31) -> State {
+pub(crate) fn jmp_abs(state: State, operand: MaybeRelocatableAddr) -> State {
+    let MaybeRelocatable::Absolute(operand) = operand else {
+        panic!("Operand must be an absolute value.")
+    };
+
     State {
         ap: state.ap,
         fp: state.fp,
@@ -29,7 +41,11 @@ pub(crate) fn jmp_abs(state: State, operand: M31) -> State {
     }
 }
 
-pub(crate) fn jmp_abs_appp(state: State, operand: M31) -> State {
+pub(crate) fn jmp_abs_appp(state: State, operand: MaybeRelocatableAddr) -> State {
+    let MaybeRelocatable::Absolute(operand) = operand else {
+        panic!("Operand must be an absolute value.")
+    };
+
     State {
         ap: state.ap + M31(1),
         fp: state.fp,
@@ -46,13 +62,8 @@ macro_rules! jmp_with_operand {
                 state: State,
                 args: InstructionArgs,
             ) -> State {
-                if let MaybeRelocatableValue::Absolute(offset) =
-                    crate::vm::operand::$operand(memory, state, &args)
-                {
-                    jmp_rel(state, assert_and_project(offset))
-                } else {
-                    panic!("Can't jump to a relocatable.")
-                }
+                let offset = crate::vm::operand::$operand(memory, state, &args);
+                jmp_rel(state, assert_and_project(offset))
             }
 
             /// Relative jump with incrementing `ap`: `jmp_rel_[ap/fp]_appp`.
@@ -61,13 +72,8 @@ macro_rules! jmp_with_operand {
                 state: State,
                 args: InstructionArgs,
             ) -> State {
-                if let MaybeRelocatableValue::Absolute(offset) =
-                    crate::vm::operand::$operand(memory, state, &args)
-                {
-                    jmp_rel_appp(state, assert_and_project(offset))
-                } else {
-                    panic!("Can't jump to a relocatable.")
-                }
+                let offset = crate::vm::operand::$operand(memory, state, &args);
+                jmp_rel_appp(state, assert_and_project(offset))
             }
 
             /// Absolute jump without incrementing `ap`: `jmp_abs_[ap/fp]`.
@@ -76,13 +82,8 @@ macro_rules! jmp_with_operand {
                 state: State,
                 args: InstructionArgs,
             ) -> State {
-                if let MaybeRelocatableValue::Absolute(offset) =
-                    crate::vm::operand::$operand(memory, state, &args)
-                {
-                    jmp_abs(state, assert_and_project(offset))
-                } else {
-                    panic!("Can't jump to a relocatable.")
-                }
+                let offset = crate::vm::operand::$operand(memory, state, &args);
+                jmp_abs(state, assert_and_project(offset))
             }
 
             /// Absolute jump with incrementing `ap`: `jmp_abs_[ap/fp]_appp`.
@@ -91,13 +92,8 @@ macro_rules! jmp_with_operand {
                 state: State,
                 args: InstructionArgs,
             ) -> State {
-                if let MaybeRelocatableValue::Absolute(offset) =
-                    crate::vm::operand::$operand(memory, state, &args)
-                {
-                    jmp_abs_appp(state, assert_and_project(offset))
-                } else {
-                    panic!("Can't jump to a relocatable.")
-                }
+                let offset = crate::vm::operand::$operand(memory, state, &args);
+                jmp_abs_appp(state, assert_and_project(offset))
             }
 
         }
