@@ -13,16 +13,16 @@ fn resolve_jnz_args(
     state: State,
     bases: &[&str; 2],
     offsets: &[M31; 2],
-) -> [QM31; 2] {
+) -> (QM31, QM31) {
     let [cond_addr, dest_addr] = resolve_addresses(state, bases, offsets);
-    let Some(MaybeRelocatable::Absolute(condition)) = memory.get(cond_addr) else {
-        panic!("Condition must be an absolute value.")
-    };
     let Some(MaybeRelocatable::Absolute(destination)) = memory.get(dest_addr) else {
         panic!("Destination must be an absolute value.")
     };
+    let Some(MaybeRelocatable::Absolute(condition)) = memory.get(cond_addr) else {
+        panic!("Condition must be an absolute value.")
+    };
 
-    [condition, destination]
+    (destination, condition)
 }
 
 fn resolve_jnz_imm_args(
@@ -30,17 +30,17 @@ fn resolve_jnz_imm_args(
     state: State,
     base: &str,
     offsets: &[M31; 2],
-) -> (M31, QM31) {
+) -> (QM31, M31) {
     let [dest_addr] = resolve_addresses(state, &[base], &[offsets[1]]);
+    let condition = offsets[0];
     let Some(MaybeRelocatable::Absolute(destination)) = memory.get(dest_addr) else {
         panic!("Destination must be an absolute value.")
     };
-    let condition = offsets[0];
 
-    (condition, destination)
+    (destination, condition)
 }
 
-fn jnz<T: Zero>(state: State, condition: T, destination: QM31) -> State {
+fn jnz(state: State, destination: QM31, condition: impl Zero) -> State {
     if condition.is_zero() {
         state.advance()
     } else {
@@ -48,7 +48,7 @@ fn jnz<T: Zero>(state: State, condition: T, destination: QM31) -> State {
     }
 }
 
-fn jnz_appp<T: Zero>(state: State, condition: T, destination: QM31) -> State {
+fn jnz_appp(state: State, destination: QM31, condition: impl Zero) -> State {
     if condition.is_zero() {
         state.advance_and_increment_ap()
     } else {
@@ -65,13 +65,13 @@ macro_rules! define_jnz {
                 state: State,
                 args: InstructionArgs,
             ) -> State {
-                let [condition, destination] = resolve_jnz_args(
+                let (destination, condition) = resolve_jnz_args(
                     memory,
                     state,
                     &[stringify!($cond), stringify!($dest)],
                     &[args[0], args[1]],
                 );
-                jnz(state, condition, destination)
+                jnz(state, destination, condition)
             }
 
             /// Jump-not-zero with incrementing `ap`: `jnz_[ap/fp]_[ap/fp][_appp]`.
@@ -80,13 +80,13 @@ macro_rules! define_jnz {
                 state: State,
                 args: InstructionArgs,
             ) -> State {
-                let [condition, destination] = resolve_jnz_args(
+                let (destination, condition) = resolve_jnz_args(
                     memory,
                     state,
                     &[stringify!($cond), stringify!($dest)],
                     &[args[0], args[1]],
                 );
-                jnz_appp(state, condition, destination)
+                jnz_appp(state, destination, condition)
             }
         }
     };
@@ -101,13 +101,13 @@ macro_rules! define_jnz_imm {
                 state: State,
                 args: InstructionArgs,
             ) -> State {
-                let (condition, destination) = resolve_jnz_imm_args(
+                let (destination, condition) = resolve_jnz_imm_args(
                     memory,
                     state,
                     stringify!($dest),
                     &[args[0], args[1]],
                 );
-                jnz(state, condition, destination)
+                jnz(state, destination, condition)
             }
 
             /// Jump-not-zero with incrementing `ap`: `jnz_imm_[ap/fp]_appp`.
@@ -116,13 +116,13 @@ macro_rules! define_jnz_imm {
                 state: State,
                 args: InstructionArgs,
             ) -> State {
-                let (condition, destination) = resolve_jnz_imm_args(
+                let (destination, condition) = resolve_jnz_imm_args(
                     memory,
                     state,
                     stringify!($dest),
                     &[args[0], args[1]],
                 );
-                jnz_appp(state, condition, destination)
+                jnz_appp(state, destination, condition)
             }
         }
     };
