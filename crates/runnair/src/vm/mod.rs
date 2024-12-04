@@ -18,9 +18,9 @@ use crate::memory::{MaybeRelocatableAddr, Memory};
 
 #[derive(Clone, Copy, Debug)]
 pub struct State {
-    ap: M31,
-    fp: M31,
-    pc: M31,
+    ap: MaybeRelocatableAddr,
+    fp: MaybeRelocatableAddr,
+    pc: MaybeRelocatableAddr,
 }
 
 impl State {
@@ -251,6 +251,6 @@ pub(crate) fn resolve_addresses<const N: usize>(
             "fp" => state.fp,
             _ => panic!("Invalid base: {}", base),
         };
-        MaybeRelocatableAddr::Absolute(base_address + offsets[i])
+        base_address + offsets[i]
     })
 }
