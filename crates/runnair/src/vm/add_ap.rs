@@ -6,10 +6,6 @@ use crate::memory::{MaybeRelocatableAddr, Memory};
 use crate::vm::{InstructionArgs, State};
 
 fn addap(state: State, summand: MaybeRelocatableAddr) -> State {
-    let MaybeRelocatable::Absolute(summand) = summand else {
-        panic!("Operand must be an absolute value.")
-    };
-
     State {
         ap: state.ap + summand,
         fp: state.fp,

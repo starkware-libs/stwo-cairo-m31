@@ -6,10 +6,6 @@ use crate::memory::{MaybeRelocatableAddr, Memory};
 use crate::vm::{InstructionArgs, State};
 
 fn jmp_rel(state: State, operand: MaybeRelocatableAddr) -> State {
-    let MaybeRelocatable::Absolute(operand) = operand else {
-        panic!("Operand must be an absolute value.")
-    };
-
     State {
         ap: state.ap,
         fp: state.fp,
@@ -18,10 +14,6 @@ fn jmp_rel(state: State, operand: MaybeRelocatableAddr) -> State {
 }
 
 fn jmp_rel_appp(state: State, operand: MaybeRelocatableAddr) -> State {
-    let MaybeRelocatable::Absolute(operand) = operand else {
-        panic!("Operand must be an absolute value.")
-    };
-
     State {
         ap: state.ap + M31(1),
         fp: state.fp,
@@ -30,10 +22,6 @@ fn jmp_rel_appp(state: State, operand: MaybeRelocatableAddr) -> State {
 }
 
 pub(crate) fn jmp_abs(state: State, operand: MaybeRelocatableAddr) -> State {
-    let MaybeRelocatable::Absolute(operand) = operand else {
-        panic!("Operand must be an absolute value.")
-    };
-
     State {
         ap: state.ap,
         fp: state.fp,
@@ -42,10 +30,6 @@ pub(crate) fn jmp_abs(state: State, operand: MaybeRelocatableAddr) -> State {
 }
 
 pub(crate) fn jmp_abs_appp(state: State, operand: MaybeRelocatableAddr) -> State {
-    let MaybeRelocatable::Absolute(operand) = operand else {
-        panic!("Operand must be an absolute value.")
-    };
-
     State {
         ap: state.ap + M31(1),
         fp: state.fp,
