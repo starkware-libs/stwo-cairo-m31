@@ -14,7 +14,7 @@ fn resolve_jnz_args(
     bases: &[&str; 2],
     offsets: &[M31; 2],
 ) -> (MaybeRelocatableAddr, QM31) {
-    let [cond_addr, dest_addr] = resolve_addresses(state, bases, offsets);
+    let [dest_addr, cond_addr] = resolve_addresses(state, bases, offsets);
     let Some(destination) = memory.get(dest_addr) else {
         panic!("Destination cannot be deduced.")
     };
@@ -30,29 +30,33 @@ fn resolve_jnz_imm_args(
     state: State,
     base: &str,
     offsets: &[M31; 2],
-) -> (MaybeRelocatableAddr, M31) {
-    let [dest_addr] = resolve_addresses(state, &[base], &[offsets[1]]);
-    let condition = offsets[0];
-    let Some(destination) = memory.get(dest_addr) else {
-        panic!("Destination cannot be deduced.")
+) -> (M31, QM31) {
+    let [cond_addr] = resolve_addresses(state, &[base], &[offsets[1]]);
+    let destination = offsets[0];
+    let Some(MaybeRelocatable::Absolute(condition)) = memory.get(cond_addr) else {
+        panic!("Condition must be an absolute value.")
     };
 
-    (assert_and_project(destination), condition)
+    (destination, condition)
 }
 
-fn jnz(state: State, destination: MaybeRelocatableAddr, condition: impl Zero) -> State {
+fn jnz(state: State, destination: impl Into<MaybeRelocatableAddr>, condition: impl Zero) -> State {
     if condition.is_zero() {
         state.advance()
     } else {
-        jmp_abs(state, destination)
+        jmp_abs(state, destination.into())
     }
 }
 
-fn jnz_appp(state: State, destination: MaybeRelocatableAddr, condition: impl Zero) -> State {
+fn jnz_appp(
+    state: State,
+    destination: impl Into<MaybeRelocatableAddr>,
+    condition: impl Zero,
+) -> State {
     if condition.is_zero() {
         state.advance_and_increment_ap()
     } else {
-        jmp_abs_appp(state, destination)
+        jmp_abs_appp(state, destination.into())
     }
 }
 
