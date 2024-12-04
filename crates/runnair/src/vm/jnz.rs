@@ -4,7 +4,7 @@ use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
 
 use crate::memory::relocatable::{assert_and_project, MaybeRelocatable};
-use crate::memory::Memory;
+use crate::memory::{MaybeRelocatableAddr, Memory};
 use crate::vm::jmp::{jmp_abs, jmp_abs_appp};
 use crate::vm::{resolve_addresses, InstructionArgs, State};
 
@@ -13,16 +13,16 @@ fn resolve_jnz_args(
     state: State,
     bases: &[&str; 2],
     offsets: &[M31; 2],
-) -> (QM31, QM31) {
+) -> (MaybeRelocatableAddr, QM31) {
     let [cond_addr, dest_addr] = resolve_addresses(state, bases, offsets);
-    let Some(MaybeRelocatable::Absolute(destination)) = memory.get(dest_addr) else {
-        panic!("Destination must be an absolute value.")
+    let Some(destination) = memory.get(dest_addr) else {
+        panic!("Destination cannot be deduced.")
     };
     let Some(MaybeRelocatable::Absolute(condition)) = memory.get(cond_addr) else {
         panic!("Condition must be an absolute value.")
     };
 
-    (destination, condition)
+    (assert_and_project(destination), condition)
 }
 
 fn resolve_jnz_imm_args(
@@ -30,29 +30,29 @@ fn resolve_jnz_imm_args(
     state: State,
     base: &str,
     offsets: &[M31; 2],
-) -> (QM31, M31) {
+) -> (MaybeRelocatableAddr, M31) {
     let [dest_addr] = resolve_addresses(state, &[base], &[offsets[1]]);
     let condition = offsets[0];
-    let Some(MaybeRelocatable::Absolute(destination)) = memory.get(dest_addr) else {
-        panic!("Destination must be an absolute value.")
+    let Some(destination) = memory.get(dest_addr) else {
+        panic!("Destination cannot be deduced.")
     };
 
-    (destination, condition)
+    (assert_and_project(destination), condition)
 }
 
-fn jnz(state: State, destination: QM31, condition: impl Zero) -> State {
+fn jnz(state: State, destination: MaybeRelocatableAddr, condition: impl Zero) -> State {
     if condition.is_zero() {
         state.advance()
     } else {
-        jmp_abs(state, assert_and_project(destination))
+        jmp_abs(state, destination)
     }
 }
 
-fn jnz_appp(state: State, destination: QM31, condition: impl Zero) -> State {
+fn jnz_appp(state: State, destination: MaybeRelocatableAddr, condition: impl Zero) -> State {
     if condition.is_zero() {
         state.advance_and_increment_ap()
     } else {
-        jmp_abs_appp(state, assert_and_project(destination))
+        jmp_abs_appp(state, destination)
     }
 }
 

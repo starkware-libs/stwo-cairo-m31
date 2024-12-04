@@ -1,6 +1,7 @@
 use stwo_prover::core::fields::m31::M31;
 
 use super::State;
+use crate::memory::relocatable::assert_and_project;
 use crate::memory::{MaybeRelocatableValue, Memory};
 
 // Adds:
@@ -71,7 +72,8 @@ pub(crate) fn double_deref_ap(
     state: State,
     args: &[M31],
 ) -> MaybeRelocatableValue {
-    memory[memory[state.ap + args[0]] + args[1]]
+    let address = assert_and_project(memory[state.ap + args[0]] + args[1]);
+    memory[address]
 }
 
 pub(crate) fn double_deref_fp(
@@ -79,5 +81,6 @@ pub(crate) fn double_deref_fp(
     state: State,
     args: &[M31],
 ) -> MaybeRelocatableValue {
-    memory[memory[state.fp + args[0]] + args[1]]
+    let address = assert_and_project(memory[state.fp + args[0]] + args[1]);
+    memory[address]
 }
