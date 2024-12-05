@@ -59,7 +59,7 @@ fn assign_or_assert_operation(
             memory.insert(dest_addr, operation.apply(op1_val, op2_val));
         }
         (Some(dest_val), None, Some(op2_val)) => {
-            memory.insert(op2_addr, operation.deduce(dest_val, op2_val));
+            memory.insert(op1_addr, operation.deduce(dest_val, op2_val));
         }
         (Some(dest_val), Some(op1_val), None) => {
             memory.insert(op2_addr, operation.deduce(dest_val, op1_val));
@@ -139,7 +139,7 @@ fn assign_or_assert_operation_with_imm(
             );
         }
         (None, Some(op1_val)) => {
-            memory.insert(dest_addr, operation.deduce(op1_val, immediate));
+            memory.insert(dest_addr, operation.apply(op1_val, immediate));
         }
         (Some(dest_val), None) => {
             memory.insert(op1_addr, operation.deduce(dest_val, immediate));
