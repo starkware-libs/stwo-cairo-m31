@@ -68,6 +68,7 @@ impl From<M31> for MaybeRelocatable<QM31> {
 }
 
 impl From<MaybeRelocatable<M31>> for MaybeRelocatable<QM31> {
+    #[inline(always)]
     fn from(value: MaybeRelocatable<M31>) -> Self {
         match value {
             MaybeRelocatable::Relocatable(x) => MaybeRelocatable::Relocatable(x),
@@ -118,6 +119,7 @@ fn assert_and_project_on_felt(x: QM31) -> M31 {
 /// For an absolute value, assert that the input is in the base field and return the projection to
 /// the base field.
 /// For a relocatable value, simply returns as-is.
+#[inline(always)]
 pub(crate) fn assert_and_project(x: MaybeRelocatable<QM31>) -> MaybeRelocatable<M31> {
     match x {
         MaybeRelocatable::Relocatable(x) => MaybeRelocatable::<M31>::Relocatable(x),
