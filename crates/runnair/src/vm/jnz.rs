@@ -5,7 +5,7 @@ use stwo_prover::core::fields::qm31::QM31;
 
 use crate::memory::relocatable::{assert_and_project, MaybeRelocatable};
 use crate::memory::{MaybeRelocatableAddr, Memory};
-use crate::vm::jmp::{jmp_abs, jmp_abs_appp};
+use crate::vm::jmp::{jmp_rel, jmp_rel_appp};
 use crate::vm::{resolve_addresses, InstructionArgs, State};
 
 fn resolve_jnz_args(
@@ -44,7 +44,7 @@ fn jnz(state: State, destination: impl Into<MaybeRelocatableAddr>, condition: im
     if condition.is_zero() {
         state.advance()
     } else {
-        jmp_abs(state, destination.into())
+        jmp_rel(state, destination.into())
     }
 }
 
@@ -56,7 +56,7 @@ fn jnz_appp(
     if condition.is_zero() {
         state.advance_and_increment_ap()
     } else {
-        jmp_abs_appp(state, destination.into())
+        jmp_rel_appp(state, destination.into())
     }
 }
 
