@@ -28,8 +28,8 @@ impl Relocatable {
 impl<T: From<M31> + Copy> MaybeRelocatable<T> {
     pub fn relocate(&self, table: &RelocationTable) -> T {
         match self {
-            MaybeRelocatable::Relocatable(relocatable) => relocatable.relocate(table).into(),
-            MaybeRelocatable::Absolute(absolute) => *absolute,
+            MaybeRelocatable::Relocatable(x) => x.relocate(table).into(),
+            MaybeRelocatable::Absolute(x) => *x,
         }
     }
 }
@@ -64,6 +64,15 @@ impl<T: From<M31>> From<T> for MaybeRelocatable<T> {
 impl From<M31> for MaybeRelocatable<QM31> {
     fn from(value: M31) -> Self {
         MaybeRelocatable::Absolute(value.into())
+    }
+}
+
+impl From<MaybeRelocatable<M31>> for MaybeRelocatable<QM31> {
+    fn from(value: MaybeRelocatable<M31>) -> Self {
+        match value {
+            MaybeRelocatable::Relocatable(x) => MaybeRelocatable::Relocatable(x),
+            MaybeRelocatable::Absolute(x) => MaybeRelocatable::Absolute(x.into()),
+        }
     }
 }
 
