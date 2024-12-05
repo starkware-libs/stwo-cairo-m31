@@ -6,7 +6,13 @@ pub mod jmp;
 pub mod jnz;
 pub mod operand;
 
+use std::fs::File;
+use std::io::BufReader;
+
+use num_traits::Zero;
+use serde::Deserialize;
 use stwo_prover::core::fields::m31::M31;
+use stwo_prover::core::fields::qm31::QM31;
 
 use self::add_ap::*;
 use self::assert::*;
@@ -14,6 +20,7 @@ use self::call::*;
 use self::deref::*;
 use self::jmp::*;
 use self::jnz::*;
+use crate::memory::relocatable::{MaybeRelocatable, Relocatable};
 use crate::memory::{MaybeRelocatableAddr, Memory};
 
 #[derive(Clone, Copy, Debug)]
@@ -41,16 +48,158 @@ impl State {
     }
 }
 
-pub struct VM {
-    _memory: Memory,
-    _state: State,
-}
-
 pub type InstructionArgs = [M31; 3];
 
+#[derive(Clone, Copy, Debug)]
+
 pub struct Instruction {
-    _op: M31,
-    _args: InstructionArgs,
+    op: M31,
+    args: InstructionArgs,
+}
+
+impl From<QM31> for Instruction {
+    fn from(instruction: QM31) -> Self {
+        let [op, args @ ..] = instruction.to_m31_array();
+        Self { op, args }
+    }
+}
+
+impl<T: Into<M31>> From<[T; 4]> for Instruction {
+    fn from(instruction: [T; 4]) -> Self {
+        let [op, args @ ..] = instruction;
+        Self {
+            op: op.into(),
+            args: args.map(|x| x.into()),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Program {
+    pub instructions: Vec<Instruction>,
+}
+
+#[derive(Deserialize)]
+struct JsonData {
+    data: Vec<[String; 4]>,
+}
+
+impl Program {
+    pub fn iter(&self) -> impl Iterator<Item = Instruction> + '_ {
+        self.instructions.iter().copied()
+    }
+
+    pub fn from_compiled_file(path: &str) -> Self {
+        let file = File::open(path).unwrap();
+        let reader = BufReader::new(file);
+        let json_data: JsonData = serde_json::from_reader(reader).unwrap();
+
+        let instructions: Vec<_> = json_data
+            .data
+            .into_iter()
+            .map(|instruction| {
+                let raw_instruction = instruction
+                    .map(|x| u32::from_str_radix(x.trim_start_matches("0x"), 16).unwrap());
+                Instruction::from(raw_instruction)
+            })
+            .collect();
+
+        Self { instructions }
+    }
+}
+
+#[derive(Debug)]
+pub struct VM {
+    memory: Memory,
+    state: State,
+}
+
+impl VM {
+    fn create_for_main_execution(program: Program) -> Self {
+        let program_segment = 0;
+        let execution_segment = 1;
+        let output_segment = 2;
+
+        let instruction_entries =
+            program
+                .instructions
+                .iter()
+                .enumerate()
+                .map(|(index, instruction)| {
+                    let args = instruction.args;
+                    let encoded_instruction =
+                        QM31::from_m31_array([instruction.op, args[0], args[1], args[2]]);
+
+                    (
+                        MaybeRelocatable::<M31>::Relocatable(
+                            (program_segment, index as u32).into(),
+                        ),
+                        MaybeRelocatable::<QM31>::Absolute(encoded_instruction),
+                    )
+                });
+
+        let memory_entries = [
+            // Segment 1: execution.
+            // Pointer to output cell.
+            (
+                MaybeRelocatable::<M31>::Relocatable((execution_segment, 0).into()),
+                MaybeRelocatable::<QM31>::Relocatable((output_segment, 0).into()),
+            ),
+            // Dummy `fp`, `pc`; we never return from main.
+            (
+                MaybeRelocatable::<M31>::Relocatable((execution_segment, 1).into()),
+                MaybeRelocatable::<QM31>::Relocatable((3, 0).into()),
+            ),
+            (
+                MaybeRelocatable::<M31>::Relocatable((execution_segment, 2).into()),
+                MaybeRelocatable::<QM31>::Relocatable((4, 0).into()),
+            ),
+            // Segment 2: output.
+            // Segment 3.
+            (
+                MaybeRelocatable::<M31>::Relocatable((3, 0).into()),
+                MaybeRelocatable::<QM31>::Absolute(QM31::zero()),
+            ),
+            // Segment 4.
+            (
+                MaybeRelocatable::<M31>::Relocatable((4, 0).into()),
+                MaybeRelocatable::<QM31>::Absolute(QM31::zero()),
+            ),
+        ];
+        let memory_entries = instruction_entries.chain(memory_entries.iter().copied());
+        let memory = Memory::from_iter(memory_entries);
+
+        let initial_stack = Relocatable::from((execution_segment, 3));
+        let pc = Relocatable::from((program_segment, 0));
+        let state = State {
+            ap: initial_stack.into(),
+            fp: initial_stack.into(),
+            pc: pc.into(),
+        };
+
+        Self { memory, state }
+    }
+
+    fn step(&mut self) {
+        let MaybeRelocatable::Absolute(instruction) = self.memory[self.state.pc] else {
+            panic!("Instruction must be an absolute value.");
+        };
+        let Instruction { op, args } = instruction.into();
+
+        let instruction_fn = opcode_to_instruction(op.0 as usize);
+        self.state = instruction_fn(&mut self.memory, self.state, args);
+    }
+
+    fn execute(&mut self) {
+        let final_fp = MaybeRelocatableAddr::Relocatable((3, 0).into());
+        let final_pc = MaybeRelocatableAddr::Relocatable((4, 0).into());
+
+        let mut n_steps = 0;
+        while self.state.pc != final_pc && self.state.fp != final_fp {
+            self.step();
+            n_steps += 1;
+        }
+    }
 }
 
 // TODO(alont): autogenerate this.
@@ -234,6 +383,7 @@ pub fn opcode_to_instruction(opcode: usize) -> fn(&mut Memory, State, Instructio
 
 // Utils.
 
+#[inline(always)]
 pub(crate) fn resolve_addresses<const N: usize>(
     state: State,
     bases: &[&str; N],
@@ -253,4 +403,18 @@ pub(crate) fn resolve_addresses<const N: usize>(
         };
         base_address + offsets[i]
     })
+}
+
+#[cfg(test)]
+mod test {
+    use crate::vm::{Program, VM};
+
+    #[test]
+    fn test_execution() {
+        let program =
+            Program::from_compiled_file("/home/elin/workspace/cairo-lang/fibonacci_compiled.json");
+        let mut vm = VM::create_for_main_execution(program);
+
+        vm.execute();
+    }
 }
