@@ -19,18 +19,25 @@ fn resolve_destination_offset(
     assert_and_project(destination_offset)
 }
 
+fn push_return_fp_and_pc(memory: &mut Memory, state: State) {
+    memory.insert(state.ap, state.fp);
+    memory.insert(state.ap + M31(1), state.pc + M31(1));
+}
+
 fn call_rel(state: State, operand: impl Into<MaybeRelocatableAddr>) -> State {
+    let next_ap = state.ap + M31(2);
     State {
-        ap: state.ap + M31(2),
-        fp: state.ap,
+        ap: next_ap,
+        fp: next_ap,
         pc: state.pc + operand.into(),
     }
 }
 
 fn call_abs(state: State, operand: impl Into<MaybeRelocatableAddr>) -> State {
+    let next_ap = state.ap + M31(2);
     State {
-        ap: state.ap + M31(2),
-        fp: state.ap,
+        ap: next_ap,
+        fp: next_ap,
         pc: operand.into(),
     }
 }
@@ -43,6 +50,7 @@ macro_rules! define_call {
                 state: State,
                 args: InstructionArgs,
             ) -> State {
+                push_return_fp_and_pc(memory, state);
                 let destination_offset =
                     resolve_destination_offset(memory, state, stringify!($op), args[0]);
                 [<call_ $type>](state, destination_offset)
@@ -55,10 +63,11 @@ macro_rules! define_call_imm {
     ($type:ident) => {
         paste! {
             pub(crate) fn [<call_ $type _imm>] (
-                _memory: &mut Memory,
+                memory: &mut Memory,
                 state: State,
                 args: InstructionArgs,
             ) -> State {
+                push_return_fp_and_pc(memory, state);
                 let immediate = args[0];
                 [<call_ $type>](state, immediate)
             }
