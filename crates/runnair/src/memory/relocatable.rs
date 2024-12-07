@@ -5,10 +5,12 @@ use num_traits::Zero;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
 
+type Segment = usize;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Relocatable {
-    segment: isize,
-    offset: M31,
+    pub segment: Segment,
+    pub offset: M31,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -17,7 +19,7 @@ pub enum MaybeRelocatable<T: From<M31>> {
     Absolute(T),
 }
 
-pub type RelocationTable = HashMap<isize, M31>;
+pub type RelocationTable = HashMap<Segment, M31>;
 
 impl Relocatable {
     pub fn relocate(&self, table: &RelocationTable) -> M31 {
@@ -34,14 +36,14 @@ impl<T: From<M31> + Copy> MaybeRelocatable<T> {
     }
 }
 
-impl From<(isize, M31)> for Relocatable {
-    fn from((segment, offset): (isize, M31)) -> Self {
+impl From<(Segment, M31)> for Relocatable {
+    fn from((segment, offset): (Segment, M31)) -> Self {
         Relocatable { segment, offset }
     }
 }
 
-impl From<(isize, u32)> for Relocatable {
-    fn from((segment, offset): (isize, u32)) -> Self {
+impl From<(Segment, u32)> for Relocatable {
+    fn from((segment, offset): (Segment, u32)) -> Self {
         Relocatable {
             segment,
             offset: M31(offset),
