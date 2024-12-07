@@ -23,7 +23,7 @@ use self::deref::*;
 use self::hints::*;
 use self::jmp::*;
 use self::jnz::*;
-use crate::memory::relocatable::{MaybeRelocatable, Relocatable};
+use crate::memory::relocatable::{MaybeRelocatable, Relocatable, Segment};
 use crate::memory::{MaybeRelocatableAddr, Memory};
 
 // TODO: reconsider input type and parsing.
@@ -160,8 +160,8 @@ impl VM {
 }
 
 impl VM {
-    const FINAL_FP: (isize, u32) = (3, 0);
-    const FINAL_PC: (isize, u32) = (4, 0);
+    const FINAL_FP: (Segment, u32) = (3, 0);
+    const FINAL_PC: (Segment, u32) = (4, 0);
 
     pub fn create_for_main_entry_point(program: Program, input: Input) -> Self {
         let program_segment = 0;
