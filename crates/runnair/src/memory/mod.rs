@@ -16,7 +16,7 @@ pub type MaybeRelocatableValue = MaybeRelocatable<QM31>;
 pub struct Memory {
     // TODO(alont) Consdier changing the implementation to segment -> (offset -> value) for memory
     // locality.
-    relocatable_data: Vec<HashMap<M31, MaybeRelocatableValue>>,
+    relocatable_data: Vec<Vec<MaybeRelocatableValue>>,
     absolute_data: HashMap<M31, MaybeRelocatableValue>,
 }
 
@@ -27,17 +27,11 @@ impl<T: Into<MaybeRelocatableAddr>> Index<T> for Memory {
         match index.into() {
             MaybeRelocatableAddr::Absolute(addr) => &self.absolute_data[&addr],
             MaybeRelocatable::Relocatable(Relocatable { segment, offset }) => {
-                &self.relocatable_data[segment][&offset]
+                &self.relocatable_data[segment][offset.0 as usize]
             }
         }
     }
 }
-
-// impl From<HashMap<MaybeRelocatableAddr, MaybeRelocatableValue>> for Memory {
-//     fn from(data: HashMap<MaybeRelocatableAddr, MaybeRelocatableValue>) -> Self {
-//         Self { data }
-//     }
-// }
 
 impl<T: Into<MaybeRelocatableAddr>, S: Into<MaybeRelocatableValue>> FromIterator<(T, S)>
     for Memory
@@ -54,14 +48,6 @@ impl<T: Into<MaybeRelocatableAddr>, S: Into<MaybeRelocatableValue>> FromIterator
 }
 
 impl Memory {
-    // pub fn relocate(&mut self, table: &RelocationTable) {
-    //     *self = self
-    //         .data
-    //         .iter()
-    //         .map(|(key, value)| (key.relocate(table), value.relocate(table)))
-    //         .collect();
-    // }
-
     #[inline(always)]
     pub fn insert<T: Into<MaybeRelocatableAddr>, S: Into<MaybeRelocatableValue>>(
         &mut self,
@@ -72,22 +58,26 @@ impl Memory {
         match key.into() {
             MaybeRelocatableAddr::Absolute(addr) => self.absolute_data.insert(addr, value),
             MaybeRelocatableAddr::Relocatable(Relocatable { segment, offset }) => {
+                let offset = offset.0 as usize;
+
                 let n_segments = self.relocatable_data.len();
                 if segment >= n_segments {
-                    let resize_by = if n_segments == 0 { 1 } else { n_segments * 2 };
-                    self.relocatable_data.resize(resize_by, HashMap::new());
+                    let resize_by = std::cmp::max(segment + 1, n_segments * 2);
+                    self.relocatable_data.resize(resize_by, Vec::new());
                 }
-                self.relocatable_data[segment].insert(offset, value)
+
+                let segment_size = self.relocatable_data[segment].len();
+                if offset >= segment_size {
+                    self.relocatable_data[segment].resize(offset + 1, value);
+                    return None;
+                }
+
+                let old_value =
+                    std::mem::replace(&mut self.relocatable_data[segment][offset], value);
+                Some(old_value)
             }
         }
     }
-
-    // pub fn entry<T: Into<MaybeRelocatableAddr>>(
-    //     &mut self,
-    //     key: T,
-    // ) -> Entry<'_, MaybeRelocatableAddr, MaybeRelocatableValue> {
-    //     self.data.entry(key.into())
-    // }
 
     #[inline(always)]
     pub fn get<T: Into<MaybeRelocatableAddr>>(&self, key: T) -> Option<MaybeRelocatableValue> {
@@ -95,32 +85,9 @@ impl Memory {
             MaybeRelocatableAddr::Absolute(addr) => self.absolute_data.get(&addr).copied(),
             MaybeRelocatableAddr::Relocatable(Relocatable { segment, offset }) => self
                 .relocatable_data
-                .get(segment)
-                .and_then(|segment| segment.get(&offset).copied()),
+                .get(segment)?
+                .get(offset.0 as usize)
+                .copied(),
         }
     }
 }
-
-// #[cfg(test)]
-// mod test {
-//     use num_traits::Zero;
-//     use stwo_prover::core::fields::m31::M31;
-//     use stwo_prover::core::fields::qm31::QM31;
-
-//     use crate::memory::relocatable::Relocatable;
-//     use crate::memory::Memory;
-
-//     #[test]
-//     fn test_relocate_memory() {
-//         let mut memory = Memory::default();
-//         memory.insert(Relocatable::from((0, 0)), QM31::zero());
-//         memory.insert(Relocatable::from((1, 1)), Relocatable::from((1, 12)));
-
-//         let table = [(0, M31(1)), (1, M31(1234))].iter().cloned().collect();
-
-//         memory.relocate(&table);
-
-//         assert_eq!(memory[M31(1)], QM31::zero().into());
-//         assert_eq!(memory[M31(1235)], QM31::from(M31(1246)).into());
-//     }
-// }
