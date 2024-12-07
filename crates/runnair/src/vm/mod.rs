@@ -115,7 +115,7 @@ pub struct VM {
 }
 
 impl VM {
-    fn create_for_main_execution(program: Program) -> Self {
+    pub(crate) fn create_for_main_execution(program: Program) -> Self {
         let program_segment = 0;
         let execution_segment = 1;
         let output_segment = 2;
@@ -190,14 +190,12 @@ impl VM {
         self.state = instruction_fn(&mut self.memory, self.state, args);
     }
 
-    fn execute(&mut self) {
+    pub(crate) fn execute(&mut self) {
         let final_fp = MaybeRelocatableAddr::Relocatable((3, 0).into());
         let final_pc = MaybeRelocatableAddr::Relocatable((4, 0).into());
 
-        let mut n_steps = 0;
         while self.state.pc != final_pc && self.state.fp != final_fp {
             self.step();
-            n_steps += 1;
         }
     }
 }
