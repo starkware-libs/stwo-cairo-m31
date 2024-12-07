@@ -1,11 +1,11 @@
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::ops::Index;
 
+use relocatable::Relocatable;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
 
-use self::relocatable::{MaybeRelocatable, RelocationTable};
+use self::relocatable::MaybeRelocatable;
 
 pub mod relocatable;
 
@@ -16,84 +16,112 @@ pub type MaybeRelocatableValue = MaybeRelocatable<QM31>;
 pub struct Memory {
     // TODO(alont) Consdier changing the implementation to segment -> (offset -> value) for memory
     // locality.
-    data: HashMap<MaybeRelocatableAddr, MaybeRelocatableValue>,
+    relocatable_data: HashMap<Relocatable, MaybeRelocatableValue>,
+    absolute_data: HashMap<M31, MaybeRelocatableValue>,
 }
 
 impl<T: Into<MaybeRelocatableAddr>> Index<T> for Memory {
     type Output = MaybeRelocatableValue;
+    #[inline(always)]
     fn index(&self, index: T) -> &Self::Output {
-        &self.data[&index.into()]
+        match index.into() {
+            MaybeRelocatableAddr::Absolute(addr) => &self.absolute_data[&addr],
+            MaybeRelocatableAddr::Relocatable(addr) => &self.relocatable_data[&addr],
+        }
     }
 }
 
-impl From<HashMap<MaybeRelocatableAddr, MaybeRelocatableValue>> for Memory {
-    fn from(data: HashMap<MaybeRelocatableAddr, MaybeRelocatableValue>) -> Self {
-        Self { data }
-    }
-}
+// impl From<HashMap<MaybeRelocatableAddr, MaybeRelocatableValue>> for Memory {
+//     fn from(data: HashMap<MaybeRelocatableAddr, MaybeRelocatableValue>) -> Self {
+//         Self { data }
+//     }
+// }
 
 impl<T: Into<MaybeRelocatableAddr>, S: Into<MaybeRelocatableValue>> FromIterator<(T, S)>
     for Memory
 {
     fn from_iter<I: IntoIterator<Item = (T, S)>>(iter: I) -> Self {
+        let mut relocatable_data = HashMap::new();
+        let mut absolute_data = HashMap::new();
+
+        for (key, value) in iter {
+            let value = value.into();
+
+            match key.into() {
+                MaybeRelocatableAddr::Relocatable(addr) => {
+                    relocatable_data.insert(addr, value);
+                }
+                MaybeRelocatableAddr::Absolute(addr) => {
+                    absolute_data.insert(addr, value);
+                }
+            }
+        }
+
         Self {
-            data: iter
-                .into_iter()
-                .map(|(key, value)| (key.into(), value.into()))
-                .collect(),
+            relocatable_data,
+            absolute_data,
         }
     }
 }
 
 impl Memory {
-    pub fn relocate(&mut self, table: &RelocationTable) {
-        *self = self
-            .data
-            .iter()
-            .map(|(key, value)| (key.relocate(table), value.relocate(table)))
-            .collect();
-    }
+    // pub fn relocate(&mut self, table: &RelocationTable) {
+    //     *self = self
+    //         .data
+    //         .iter()
+    //         .map(|(key, value)| (key.relocate(table), value.relocate(table)))
+    //         .collect();
+    // }
 
+    #[inline(always)]
     pub fn insert<T: Into<MaybeRelocatableAddr>, S: Into<MaybeRelocatableValue>>(
         &mut self,
         key: T,
         value: S,
     ) -> Option<MaybeRelocatableValue> {
-        self.data.insert(key.into(), value.into())
+        let value = value.into();
+        match key.into() {
+            MaybeRelocatableAddr::Absolute(addr) => self.absolute_data.insert(addr, value),
+            MaybeRelocatableAddr::Relocatable(addr) => self.relocatable_data.insert(addr, value),
+        }
     }
 
-    pub fn entry<T: Into<MaybeRelocatableAddr>>(
-        &mut self,
-        key: T,
-    ) -> Entry<'_, MaybeRelocatableAddr, MaybeRelocatableValue> {
-        self.data.entry(key.into())
-    }
+    // pub fn entry<T: Into<MaybeRelocatableAddr>>(
+    //     &mut self,
+    //     key: T,
+    // ) -> Entry<'_, MaybeRelocatableAddr, MaybeRelocatableValue> {
+    //     self.data.entry(key.into())
+    // }
 
+    #[inline(always)]
     pub fn get<T: Into<MaybeRelocatableAddr>>(&self, key: T) -> Option<MaybeRelocatableValue> {
-        self.data.get(&key.into()).copied()
+        match key.into() {
+            MaybeRelocatableAddr::Absolute(addr) => self.absolute_data.get(&addr).copied(),
+            MaybeRelocatableAddr::Relocatable(addr) => self.relocatable_data.get(&addr).copied(),
+        }
     }
 }
 
-#[cfg(test)]
-mod test {
-    use num_traits::Zero;
-    use stwo_prover::core::fields::m31::M31;
-    use stwo_prover::core::fields::qm31::QM31;
+// #[cfg(test)]
+// mod test {
+//     use num_traits::Zero;
+//     use stwo_prover::core::fields::m31::M31;
+//     use stwo_prover::core::fields::qm31::QM31;
 
-    use crate::memory::relocatable::Relocatable;
-    use crate::memory::Memory;
+//     use crate::memory::relocatable::Relocatable;
+//     use crate::memory::Memory;
 
-    #[test]
-    fn test_relocate_memory() {
-        let mut memory = Memory::default();
-        memory.insert(Relocatable::from((0, 0)), QM31::zero());
-        memory.insert(Relocatable::from((1, 1)), Relocatable::from((1, 12)));
+//     #[test]
+//     fn test_relocate_memory() {
+//         let mut memory = Memory::default();
+//         memory.insert(Relocatable::from((0, 0)), QM31::zero());
+//         memory.insert(Relocatable::from((1, 1)), Relocatable::from((1, 12)));
 
-        let table = [(0, M31(1)), (1, M31(1234))].iter().cloned().collect();
+//         let table = [(0, M31(1)), (1, M31(1234))].iter().cloned().collect();
 
-        memory.relocate(&table);
+//         memory.relocate(&table);
 
-        assert_eq!(memory[M31(1)], QM31::zero().into());
-        assert_eq!(memory[M31(1235)], QM31::from(M31(1246)).into());
-    }
-}
+//         assert_eq!(memory[M31(1)], QM31::zero().into());
+//         assert_eq!(memory[M31(1235)], QM31::from(M31(1246)).into());
+//     }
+// }
