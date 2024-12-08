@@ -408,10 +408,15 @@ mod test {
 
     #[test]
     fn test_execution() {
-        let program =
-            Program::from_compiled_file("/home/elin/workspace/cairo-lang/fibonacci_compiled.json");
+        let program = Program::from_compiled_file("./fibonacci_compiled.json");
+
+        let t = std::time::SystemTime::now();
         let mut vm = VM::create_for_main_execution(program);
 
         vm.execute();
+        println!(
+            "Run time: {:?}",
+            std::time::SystemTime::now().duration_since(t).unwrap()
+        );
     }
 }
