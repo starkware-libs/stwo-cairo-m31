@@ -907,6 +907,7 @@ dependencies = [
  "paste",
  "rand",
  "serde",
+ "serde_json",
  "sonic-rs",
  "stwo-prover",
  "thiserror",
