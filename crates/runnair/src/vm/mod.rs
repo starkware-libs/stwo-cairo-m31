@@ -5,8 +5,14 @@ pub mod deref;
 pub mod jmp;
 pub mod jnz;
 pub mod operand;
+use std::fs::File;
+use std::io::BufReader;
+use std::path::PathBuf;
 
+use serde::Deserialize;
+use serde_json;
 use stwo_prover::core::fields::m31::M31;
+use stwo_prover::core::fields::qm31::QM31;
 
 use self::add_ap::*;
 use self::assert::*;
@@ -41,16 +47,74 @@ impl State {
     }
 }
 
-pub struct VM {
-    _memory: Memory,
-    _state: State,
-}
+pub(crate) type InstructionArgs = [M31; 3];
 
-pub type InstructionArgs = [M31; 3];
+#[derive(Clone, Copy, Debug)]
 
-pub struct Instruction {
+pub(crate) struct Instruction {
     _op: M31,
     _args: InstructionArgs,
+}
+
+impl From<QM31> for Instruction {
+    fn from(instruction: QM31) -> Self {
+        let [_op, _args @ ..] = instruction.to_m31_array();
+        Self { _op, _args }
+    }
+}
+
+impl<T: Into<M31>> From<[T; 4]> for Instruction {
+    fn from(instruction: [T; 4]) -> Self {
+        let [op, args @ ..] = instruction;
+        Self {
+            _op: op.into(),
+            _args: args.map(|x| x.into()),
+        }
+    }
+}
+
+// TODO: add hints.
+#[derive(Debug, Deserialize)]
+#[serde(try_from = "ProgramRaw")]
+struct Program {
+    _instructions: Vec<Instruction>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ProgramRaw {
+    data: Vec<[String; 4]>,
+}
+
+impl TryFrom<ProgramRaw> for Program {
+    type Error = serde_json::Error;
+
+    fn try_from(raw_program: ProgramRaw) -> Result<Self, Self::Error> {
+        let _instructions: Vec<_> = raw_program
+            .data
+            .into_iter()
+            .map(|instruction| {
+                let raw_instruction = instruction.map(|x| m31_from_hex_str(&x));
+                Instruction::from(raw_instruction)
+            })
+            .collect();
+
+        Ok(Self { _instructions })
+    }
+}
+
+impl Program {
+    fn _from_compiled_file(path: PathBuf) -> Self {
+        let file = File::open(path).unwrap();
+        let reader = BufReader::new(file);
+        let raw_program: ProgramRaw = serde_json::from_reader(reader).unwrap();
+        Program::try_from(raw_program).unwrap()
+    }
+}
+
+#[derive(Debug)]
+struct VM {
+    _memory: Memory,
+    _state: State,
 }
 
 // TODO(alont): autogenerate this.
@@ -253,4 +317,28 @@ pub(crate) fn resolve_addresses<const N: usize>(
         };
         base_address + offsets[i]
     })
+}
+
+fn m31_from_hex_str(x: &str) -> M31 {
+    M31(u32::from_str_radix(x.trim_start_matches("0x"), 16).unwrap())
+}
+
+fn _get_crate_dir() -> PathBuf {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest_dir.to_path_buf()
+}
+
+fn _get_tests_data_dir() -> PathBuf {
+    _get_crate_dir().join("tests").join("data")
+}
+
+#[cfg(test)]
+mod test {
+    use crate::vm::{Program, _get_tests_data_dir};
+
+    #[test]
+    fn test_runner() {
+        let program_path = _get_tests_data_dir().join("fibonacci_compiled.json");
+        Program::_from_compiled_file(program_path);
+    }
 }
