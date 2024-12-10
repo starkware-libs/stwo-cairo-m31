@@ -12,6 +12,8 @@ pub mod relocatable;
 pub type MaybeRelocatableAddr = MaybeRelocatable<M31>;
 pub type MaybeRelocatableValue = MaybeRelocatable<QM31>;
 
+const MAX_MEMORY_SIZE_BITS: u8 = 26;
+
 #[derive(Clone, Debug, Default)]
 pub struct Memory {
     // TODO(alont) Consdier changing the implementation to segment -> (offset -> value) for memory
@@ -26,6 +28,14 @@ impl<T: Into<MaybeRelocatableAddr>> Index<T> for Memory {
         match index.into() {
             MaybeRelocatableAddr::Absolute(addr) => &self.absolute_data[&addr],
             MaybeRelocatableAddr::Relocatable(addr) => &self.relocatable_data[&addr],
+        }
+    }
+}
+
+impl<T: Into<MaybeRelocatableAddr>, S: Into<MaybeRelocatableValue>> Extend<(T, S)> for Memory {
+    fn extend<I: IntoIterator<Item = (T, S)>>(&mut self, iter: I) {
+        for (key, value) in iter {
+            self.insert(key, value);
         }
     }
 }
@@ -76,7 +86,10 @@ impl Memory {
     ) -> Option<MaybeRelocatableValue> {
         let value = value.into();
         match key.into() {
-            MaybeRelocatableAddr::Absolute(addr) => self.absolute_data.insert(addr, value),
+            MaybeRelocatableAddr::Absolute(addr) => {
+                validate_address(addr);
+                self.absolute_data.insert(addr, value)
+            }
             MaybeRelocatableAddr::Relocatable(addr) => self.relocatable_data.insert(addr, value),
         }
     }
@@ -86,6 +99,14 @@ impl Memory {
             MaybeRelocatableAddr::Absolute(addr) => self.absolute_data.get(&addr).copied(),
             MaybeRelocatableAddr::Relocatable(addr) => self.relocatable_data.get(&addr).copied(),
         }
+    }
+}
+
+// Utils.
+
+fn validate_address(address: M31) {
+    if address.0 > (1 << MAX_MEMORY_SIZE_BITS) {
+        panic!("Max memory size is 2 ** {MAX_MEMORY_SIZE_BITS}; got address: {address}.")
     }
 }
 

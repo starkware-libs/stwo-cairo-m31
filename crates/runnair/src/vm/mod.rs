@@ -9,6 +9,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 
+use num_traits::Zero;
 use serde::Deserialize;
 use serde_json;
 use stwo_prover::core::fields::m31::M31;
@@ -20,6 +21,7 @@ use self::call::*;
 use self::deref::*;
 use self::jmp::*;
 use self::jnz::*;
+use crate::memory::relocatable::Relocatable;
 use crate::memory::{MaybeRelocatableAddr, Memory};
 
 #[derive(Clone, Copy, Debug)]
@@ -124,6 +126,68 @@ impl VM {
 
     pub fn state(&self) -> &State {
         &self.state
+    }
+}
+
+impl VM {
+    const FINAL_FP: (isize, u32) = (3, 0);
+    const FINAL_PC: (isize, u32) = (4, 0);
+
+    pub(crate) fn create_for_main_execution(program: Program) -> Self {
+        let program_segment = 0;
+        let execution_segment = 1;
+        let output_segment = 2;
+
+        // Prepare memory.
+
+        // Segment 0: program.
+        let program_memory_segment =
+            program
+                .instructions
+                .iter()
+                .enumerate()
+                .map(|(index, instruction)| {
+                    let args = instruction.args;
+                    let encoded_instruction =
+                        QM31::from_m31_array([instruction.op, args[0], args[1], args[2]]);
+                    let instruction_address =
+                        Relocatable::from((program_segment, u32::try_from(index).unwrap()));
+
+                    (instruction_address, encoded_instruction)
+                });
+
+        let mut memory = Memory::from_iter(program_memory_segment);
+
+        // Segment 1: execution.
+        let execution_memory_segment = [
+            // Pointer to output cell.
+            ((execution_segment, 0), (output_segment, 0)),
+            // Final `fp`, `pc`; we never return from main.
+            ((execution_segment, 1), Self::FINAL_FP),
+            ((execution_segment, 2), Self::FINAL_PC),
+        ]
+        .map(|(address, value)| (Relocatable::from(address), Relocatable::from(value)));
+        memory.extend(execution_memory_segment);
+
+        // Segments 3, 4: write final `fp`, `pc`.
+        let final_pointers = [
+            (Self::FINAL_FP, QM31::zero()),
+            (Self::FINAL_PC, QM31::zero()),
+        ]
+        .map(|(address, value)| (Relocatable::from(address), value));
+        memory.extend(final_pointers);
+
+        // Prepare state.
+
+        let initial_stack = Relocatable::from((execution_segment, 3));
+        let pc = Relocatable::from((program_segment, 0));
+        let state = State {
+            ap: initial_stack.into(),
+            fp: initial_stack.into(),
+            pc: pc.into(),
+        };
+
+        Self { memory, state }
     }
 }
 
@@ -344,7 +408,8 @@ pub(crate) fn get_tests_data_dir() -> PathBuf {
 
 pub(crate) fn run_fibonacci() {
     let program_path = get_tests_data_dir().join("fibonacci_compiled.json");
-    Program::from_compiled_file(program_path);
+    let program = Program::from_compiled_file(program_path);
+    VM::create_for_main_execution(program);
 }
 
 #[cfg(test)]
