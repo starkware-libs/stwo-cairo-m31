@@ -2,6 +2,7 @@ pub mod add_ap;
 pub mod assert;
 pub mod call;
 pub mod deref;
+pub mod hints;
 pub mod jmp;
 pub mod jnz;
 pub mod operand;
@@ -19,10 +20,14 @@ use self::add_ap::*;
 use self::assert::*;
 use self::call::*;
 use self::deref::*;
+use self::hints::*;
 use self::jmp::*;
 use self::jnz::*;
 use crate::memory::relocatable::{MaybeRelocatable, Relocatable};
 use crate::memory::{MaybeRelocatableAddr, Memory};
+
+// TODO: reconsider input type and parsing.
+pub(crate) type Input = serde_json::Value;
 
 #[derive(Clone, Copy, Debug)]
 pub struct State {
@@ -79,12 +84,13 @@ impl<T: Into<M31>> From<[T; 4]> for Instruction {
 #[serde(try_from = "ProgramRaw")]
 pub struct Program {
     pub instructions: Vec<Instruction>,
+    pub hints: Hints,
 }
 
 #[derive(Debug, Deserialize)]
-
 struct ProgramRaw {
     data: Vec<[String; 4]>,
+    hints: serde_json::Map<String, serde_json::Value>,
 }
 
 impl TryFrom<ProgramRaw> for Program {
@@ -100,7 +106,30 @@ impl TryFrom<ProgramRaw> for Program {
             })
             .collect();
 
-        Ok(Self { instructions })
+        let pc_to_hint = raw_program
+            .hints
+            .into_iter()
+            .filter_map(|(pc, hints_at_pc)| {
+                let pc = usize::from_str_radix(&pc, 16).unwrap();
+                let code = hints_at_pc.as_array()?.first()?.get("code")?.as_str()?;
+                Some((pc, serde_json::from_str(code).ok()?))
+            });
+
+        let mut hints = Hints::new();
+        for (pc, hint) in pc_to_hint.into_iter() {
+            let n_hints = hints.len();
+            if pc >= n_hints {
+                let resize_by = std::cmp::max(pc + 1, n_hints * 2);
+                hints.resize(resize_by, None);
+            }
+
+            hints[pc] = Some(hint);
+        }
+
+        Ok(Self {
+            instructions,
+            hints,
+        })
     }
 }
 
@@ -117,6 +146,7 @@ impl Program {
 pub struct VM {
     memory: Memory,
     state: State,
+    hint_runner: HintRunner,
 }
 
 impl VM {
@@ -133,7 +163,7 @@ impl VM {
     const FINAL_FP: (isize, u32) = (3, 0);
     const FINAL_PC: (isize, u32) = (4, 0);
 
-    pub fn create_for_main_entry_point(program: Program) -> Self {
+    pub fn create_for_main_entry_point(program: Program, input: Input) -> Self {
         let program_segment = 0;
         let execution_segment = 1;
         let output_segment = 2;
@@ -186,10 +216,19 @@ impl VM {
             pc: pc.into(),
         };
 
-        Self { memory, state }
+        // Prepare hint runner.
+        let hint_runner = HintRunner::new(program.hints, input);
+
+        Self {
+            memory,
+            state,
+            hint_runner,
+        }
     }
 
     fn step(&mut self) {
+        self.hint_runner
+            .maybe_execute_hint(&mut self.memory, &self.state);
         self.execute_instruction();
     }
 
@@ -427,6 +466,11 @@ pub(crate) fn m31_from_hex_str(x: &str) -> M31 {
     M31(u32::from_str_radix(x.trim_start_matches("0x"), 16).unwrap())
 }
 
+pub(crate) fn qm31_from_hex_str_array(x: [&str; 4]) -> QM31 {
+    let m31_array = x.map(m31_from_hex_str);
+    QM31::from_m31_array(m31_array)
+}
+
 pub(crate) fn get_crate_dir() -> PathBuf {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     manifest_dir.to_path_buf()
@@ -439,7 +483,8 @@ pub(crate) fn get_tests_data_dir() -> PathBuf {
 pub fn run_fibonacci() {
     let program_path = get_tests_data_dir().join("fibonacci_compiled.json");
     let program = Program::from_compiled_file(program_path);
-    let mut vm = VM::create_for_main_entry_point(program);
+    let input = serde_json::json!({ "fibonacci_claim_index": ["0x64", "0x0", "0x0", "0x0"]});
+    let mut vm = VM::create_for_main_entry_point(program, input);
 
     vm.execute();
 }

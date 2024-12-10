@@ -7,8 +7,8 @@ use stwo_prover::core::fields::qm31::QM31;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Relocatable {
-    segment: isize,
-    offset: M31,
+    pub segment: isize,
+    pub offset: M31,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
