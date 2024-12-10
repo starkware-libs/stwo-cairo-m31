@@ -50,16 +50,15 @@ impl State {
 pub(crate) type InstructionArgs = [M31; 3];
 
 #[derive(Clone, Copy, Debug)]
-
-pub(crate) struct Instruction {
-    _op: M31,
-    _args: InstructionArgs,
+pub struct Instruction {
+    pub op: M31,
+    pub args: InstructionArgs,
 }
 
 impl From<QM31> for Instruction {
     fn from(instruction: QM31) -> Self {
-        let [_op, _args @ ..] = instruction.to_m31_array();
-        Self { _op, _args }
+        let [op, args @ ..] = instruction.to_m31_array();
+        Self { op, args }
     }
 }
 
@@ -67,8 +66,8 @@ impl<T: Into<M31>> From<[T; 4]> for Instruction {
     fn from(instruction: [T; 4]) -> Self {
         let [op, args @ ..] = instruction;
         Self {
-            _op: op.into(),
-            _args: args.map(|x| x.into()),
+            op: op.into(),
+            args: args.map(|x| x.into()),
         }
     }
 }
@@ -76,11 +75,12 @@ impl<T: Into<M31>> From<[T; 4]> for Instruction {
 // TODO: add hints.
 #[derive(Debug, Deserialize)]
 #[serde(try_from = "ProgramRaw")]
-struct Program {
-    _instructions: Vec<Instruction>,
+pub struct Program {
+    pub instructions: Vec<Instruction>,
 }
 
 #[derive(Debug, Deserialize)]
+
 struct ProgramRaw {
     data: Vec<[String; 4]>,
 }
@@ -89,7 +89,7 @@ impl TryFrom<ProgramRaw> for Program {
     type Error = serde_json::Error;
 
     fn try_from(raw_program: ProgramRaw) -> Result<Self, Self::Error> {
-        let _instructions: Vec<_> = raw_program
+        let instructions: Vec<_> = raw_program
             .data
             .into_iter()
             .map(|instruction| {
@@ -98,12 +98,12 @@ impl TryFrom<ProgramRaw> for Program {
             })
             .collect();
 
-        Ok(Self { _instructions })
+        Ok(Self { instructions })
     }
 }
 
 impl Program {
-    fn _from_compiled_file(path: PathBuf) -> Self {
+    fn from_compiled_file(path: PathBuf) -> Self {
         let file = File::open(path).unwrap();
         let reader = BufReader::new(file);
         let raw_program: ProgramRaw = serde_json::from_reader(reader).unwrap();
@@ -112,10 +112,22 @@ impl Program {
 }
 
 #[derive(Debug)]
-struct VM {
-    _memory: Memory,
-    _state: State,
+pub struct VM {
+    memory: Memory,
+    state: State,
 }
+
+impl VM {
+    pub fn memory(&self) -> &Memory {
+        &self.memory
+    }
+
+    pub fn state(&self) -> &State {
+        &self.state
+    }
+}
+
+// Utils.
 
 // TODO(alont): autogenerate this.
 pub fn opcode_to_instruction(opcode: usize) -> fn(&mut Memory, State, InstructionArgs) -> State {
@@ -296,8 +308,6 @@ pub fn opcode_to_instruction(opcode: usize) -> fn(&mut Memory, State, Instructio
     }
 }
 
-// Utils.
-
 pub(crate) fn resolve_addresses<const N: usize>(
     state: State,
     bases: &[&str; N],
@@ -319,26 +329,30 @@ pub(crate) fn resolve_addresses<const N: usize>(
     })
 }
 
-fn m31_from_hex_str(x: &str) -> M31 {
+pub(crate) fn m31_from_hex_str(x: &str) -> M31 {
     M31(u32::from_str_radix(x.trim_start_matches("0x"), 16).unwrap())
 }
 
-fn _get_crate_dir() -> PathBuf {
+pub(crate) fn get_crate_dir() -> PathBuf {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     manifest_dir.to_path_buf()
 }
 
-fn _get_tests_data_dir() -> PathBuf {
-    _get_crate_dir().join("tests").join("data")
+pub(crate) fn get_tests_data_dir() -> PathBuf {
+    get_crate_dir().join("tests").join("data")
+}
+
+pub(crate) fn run_fibonacci() {
+    let program_path = get_tests_data_dir().join("fibonacci_compiled.json");
+    Program::from_compiled_file(program_path);
 }
 
 #[cfg(test)]
 mod test {
-    use crate::vm::{Program, _get_tests_data_dir};
+    use crate::vm::run_fibonacci;
 
     #[test]
     fn test_runner() {
-        let program_path = _get_tests_data_dir().join("fibonacci_compiled.json");
-        Program::_from_compiled_file(program_path);
+        run_fibonacci()
     }
 }

@@ -37,7 +37,7 @@ macro_rules! define_assert_deref {
     ($dest:ident, $op1:ident) => {
         paste! {
             /// Assert deref without incrementing `ap`: `assert_[ap/fp]_deref_[ap/fp]`.
-            pub fn [<assert_ $dest _deref_ $op1>](
+            pub(crate) fn [<assert_ $dest _deref_ $op1>](
                 memory: &mut Memory,
                 state: State,
                 args: InstructionArgs
@@ -52,7 +52,7 @@ macro_rules! define_assert_deref {
             }
 
             /// Assert deref with incrementing `ap`: `assert_[ap/fp]_deref_[ap/fp]_appp`.
-            pub fn [<assert_ $dest _deref_ $op1 _appp>](
+            pub(crate) fn [<assert_ $dest _deref_ $op1 _appp>](
                 memory: &mut Memory,
                 state: State,
                 args: InstructionArgs
@@ -92,7 +92,7 @@ macro_rules! define_assert_double_deref {
         paste! {
             /// Assert double deref without incrementing `ap`:
             /// `assert_[ap/fp]_double_deref_[ap/fp]`.
-            pub fn [<assert_ $dest _double_deref_ $op1>](
+            pub(crate) fn [<assert_ $dest _double_deref_ $op1>](
                 memory: &mut Memory,
                 state: State,
                 args: InstructionArgs
@@ -108,7 +108,7 @@ macro_rules! define_assert_double_deref {
 
             /// Assert double deref with incrementing `ap`:
             /// `assert_[ap/fp]_double_deref_[ap/fp]_appp`.
-            pub fn [<assert_ $dest _double_deref_ $op1 _appp>](
+            pub(crate) fn [<assert_ $dest _double_deref_ $op1 _appp>](
                 memory: &mut Memory,
                 state: State,
                 args: InstructionArgs
