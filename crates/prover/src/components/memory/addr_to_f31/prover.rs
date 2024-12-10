@@ -51,6 +51,19 @@ impl ClaimGenerator {
         }
     }
 
+    pub fn deduce_output(&self, input: PackedM31) -> PackedM31 {
+        let indices = input.to_array().map(|i| i.0 as usize);
+        let values = indices.map(|i| self.values[i / N_LANES].to_array()[i % N_LANES]);
+        PackedM31::from_array(values)
+    }
+
+    pub fn add_inputs_simd(&mut self, inputs: &PackedM31) {
+        let memory_ids = inputs.to_array();
+        for memory_id in memory_ids {
+            self.add_inputs(usize::try_from(memory_id.0).unwrap());
+        }
+    }
+
     pub fn add_inputs(&mut self, memory_index: usize) {
         self.multiplicities[memory_index] += 1;
     }
@@ -148,6 +161,3 @@ impl InteractionClaimGenerator {
         InteractionClaim { claimed_sum }
     }
 }
-
-// del rangecheck, split, redudnet stuff, small
-// u32 -> m31

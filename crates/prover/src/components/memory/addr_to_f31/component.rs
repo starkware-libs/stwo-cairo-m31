@@ -78,7 +78,7 @@ pub struct Claim {
 impl Claim {
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
         let interaction_0_log_size = vec![self.log_size; N_COLUMNS];
-        let interaction_1_log_size = vec![self.log_size; SECURE_EXTENSION_DEGREE]; // ???
+        let interaction_1_log_size = vec![self.log_size; SECURE_EXTENSION_DEGREE];
         let fixed_column_log_sizes = vec![self.log_size];
         TreeVec::new(vec![
             interaction_0_log_size,
