@@ -12,7 +12,7 @@ pub mod relocatable;
 pub type MaybeRelocatableAddr = MaybeRelocatable<M31>;
 pub type MaybeRelocatableValue = MaybeRelocatable<QM31>;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Memory {
     // TODO(alont) Consdier changing the implementation to segment -> (offset -> value) for memory
     // locality.

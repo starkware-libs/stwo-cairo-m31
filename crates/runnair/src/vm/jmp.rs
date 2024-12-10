@@ -21,7 +21,7 @@ pub(crate) fn jmp_rel_appp(state: State, operand: MaybeRelocatableAddr) -> State
     }
 }
 
-pub fn jmp_abs(state: State, operand: MaybeRelocatableAddr) -> State {
+pub(crate) fn jmp_abs(state: State, operand: MaybeRelocatableAddr) -> State {
     State {
         ap: state.ap,
         fp: state.fp,
@@ -29,7 +29,7 @@ pub fn jmp_abs(state: State, operand: MaybeRelocatableAddr) -> State {
     }
 }
 
-pub fn jmp_abs_appp(state: State, operand: MaybeRelocatableAddr) -> State {
+pub(crate) fn jmp_abs_appp(state: State, operand: MaybeRelocatableAddr) -> State {
     State {
         ap: state.ap + M31(1),
         fp: state.fp,
