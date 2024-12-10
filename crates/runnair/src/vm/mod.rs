@@ -21,7 +21,7 @@ use self::call::*;
 use self::deref::*;
 use self::jmp::*;
 use self::jnz::*;
-use crate::memory::relocatable::Relocatable;
+use crate::memory::relocatable::{MaybeRelocatable, Relocatable};
 use crate::memory::{MaybeRelocatableAddr, Memory};
 
 #[derive(Clone, Copy, Debug)]
@@ -133,7 +133,7 @@ impl VM {
     const FINAL_FP: (isize, u32) = (3, 0);
     const FINAL_PC: (isize, u32) = (4, 0);
 
-    pub(crate) fn create_for_main_entry_point(program: Program) -> Self {
+    pub fn create_for_main_entry_point(program: Program) -> Self {
         let program_segment = 0;
         let execution_segment = 1;
         let output_segment = 2;
@@ -188,13 +188,44 @@ impl VM {
 
         Self { memory, state }
     }
+
+    fn step(&mut self) {
+        self.execute_instruction();
+    }
+
+    fn execute_instruction(&mut self) {
+        let MaybeRelocatable::Absolute(instruction) = self.memory[self.state.pc] else {
+            panic!("Instruction must be an absolute value.");
+        };
+        let Instruction { op, args } = instruction.into();
+        let instruction_fn = opcode_to_instruction(op);
+
+        self.state = instruction_fn(&mut self.memory, self.state, args);
+    }
+
+    pub fn execute(&mut self) {
+        let [final_fp, final_pc] =
+            [Self::FINAL_FP, Self::FINAL_PC].map(|x| MaybeRelocatableAddr::Relocatable(x.into()));
+
+        while self.state.pc != final_pc {
+            self.step();
+        }
+
+        assert_eq!(
+            self.state.fp, final_fp,
+            "Only final `fp` is allowed when at final `pc`."
+        );
+    }
 }
 
 // Utils.
 
+type InstructionFn = fn(&mut Memory, State, InstructionArgs) -> State;
+
 // TODO(alont): autogenerate this.
-pub fn opcode_to_instruction(opcode: usize) -> fn(&mut Memory, State, InstructionArgs) -> State {
-    match opcode {
+// TODO: optimize order.
+fn opcode_to_instruction(opcode: M31) -> InstructionFn {
+    match opcode.0 {
         0 => addap_add_ap_ap,
         1 => addap_add_ap_fp,
         2 => addap_add_fp_ap,
@@ -405,10 +436,12 @@ pub(crate) fn get_tests_data_dir() -> PathBuf {
     get_crate_dir().join("tests").join("data")
 }
 
-pub(crate) fn run_fibonacci() {
+pub fn run_fibonacci() {
     let program_path = get_tests_data_dir().join("fibonacci_compiled.json");
     let program = Program::from_compiled_file(program_path);
-    VM::create_for_main_entry_point(program);
+    let mut vm = VM::create_for_main_entry_point(program);
+
+    vm.execute();
 }
 
 #[cfg(test)]
