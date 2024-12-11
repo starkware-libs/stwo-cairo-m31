@@ -25,7 +25,7 @@ use self::jmp::*;
 use self::jnz::*;
 use crate::memory::relocatable::{MaybeRelocatable, Relocatable, Segment};
 use crate::memory::{MaybeRelocatableAddr, Memory};
-use crate::utils::{get_tests_data_dir, m31_from_hex_str, u32_from_usize};
+use crate::utils::{get_tests_data_dir, m31_from_hex_str, maybe_resize, u32_from_usize};
 
 // TODO: reconsider input type and parsing.
 pub(crate) type Input = serde_json::Value;
@@ -118,12 +118,7 @@ impl TryFrom<ProgramRaw> for Program {
 
         let mut hints = Hints::new();
         for (pc, hint) in pc_to_hint.into_iter() {
-            let n_hints = hints.len();
-            if pc >= n_hints {
-                let resize_by = std::cmp::max(pc + 1, n_hints * 2);
-                hints.resize(resize_by, None);
-            }
-
+            maybe_resize(&mut hints, pc, None);
             hints[pc] = Some(hint);
         }
 

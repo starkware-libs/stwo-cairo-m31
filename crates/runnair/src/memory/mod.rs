@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 use std::ops::Index;
 
-use relocatable::{Relocatable, RelocationTable};
+use relocatable::{Relocatable, RelocationTable, Segment};
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
 
 use self::relocatable::MaybeRelocatable;
+use crate::utils::{maybe_resize, u32_from_usize, usize_from_u32};
 
 pub mod relocatable;
 
@@ -19,7 +20,8 @@ const MAX_MEMORY_SIZE_BITS: u8 = 30;
 pub struct Memory {
     // TODO(alont) Consdier changing the implementation to segment -> (offset -> value) for memory
     // locality.
-    relocatable_data: Vec<HashMap<M31, MaybeRelocatableValue>>,
+    relocatable_data: Vec<Vec<Option<MaybeRelocatable<QM31>>>>,
+    // TODO: convert to a vector.
     absolute_data: HashMap<M31, MaybeRelocatableValue>,
 }
 
@@ -29,7 +31,12 @@ impl<T: Into<MaybeRelocatableAddr>> Index<T> for Memory {
         match index.into() {
             MaybeRelocatableAddr::Absolute(addr) => &self.absolute_data[&addr],
             MaybeRelocatable::Relocatable(Relocatable { segment, offset }) => {
-                &self.relocatable_data[segment][&offset]
+                let segment_info = &self.relocatable_data[segment];
+                let offset = usize_from_u32(offset.0);
+
+                segment_info[offset].as_ref().unwrap_or_else(|| {
+                    panic!("Offset {offset} is out of bounds for segment {segment}.");
+                })
             }
         }
     }
@@ -59,16 +66,11 @@ impl<T: Into<MaybeRelocatableAddr>, S: Into<MaybeRelocatableValue>> FromIterator
 
 impl Memory {
     pub fn relocate(&mut self, table: &RelocationTable) {
-        let relocated_data =
-            self.relocatable_data
-                .iter()
-                .enumerate()
-                .flat_map(|(segment, segment_info)| {
-                    segment_info.iter().map(move |(&offset, value)| {
-                        let key = Relocatable { segment, offset };
-                        (key.relocate(table), value.relocate(table).into())
-                    })
-                });
+        let relocated_data = self
+            .relocatable_data
+            .iter()
+            .enumerate()
+            .flat_map(|(segment, segment_info)| relocate_segment(segment, segment_info, table));
 
         self.absolute_data.extend(relocated_data);
         self.relocatable_data.clear();
@@ -80,19 +82,20 @@ impl Memory {
         value: S,
     ) -> Option<MaybeRelocatableValue> {
         let value = value.into();
+
         match key.into() {
             MaybeRelocatableAddr::Absolute(addr) => {
                 validate_address(addr);
                 self.absolute_data.insert(addr, value)
             }
             MaybeRelocatableAddr::Relocatable(Relocatable { segment, offset }) => {
-                let n_segments = self.relocatable_data.len();
-                if segment >= n_segments {
-                    let resize_by = std::cmp::max(segment + 1, n_segments * 2);
-                    self.relocatable_data.resize(resize_by, HashMap::new());
-                }
+                maybe_resize(&mut self.relocatable_data, segment, Vec::new());
 
-                self.relocatable_data[segment].insert(offset, value)
+                let segment_info = &mut self.relocatable_data[segment];
+                let offset = usize_from_u32(offset.0);
+                maybe_resize(segment_info, offset, None);
+
+                std::mem::replace(&mut segment_info[offset], Some(value))
             }
         }
     }
@@ -100,10 +103,10 @@ impl Memory {
     pub fn get<T: Into<MaybeRelocatableAddr>>(&self, key: T) -> Option<MaybeRelocatableValue> {
         match key.into() {
             MaybeRelocatableAddr::Absolute(addr) => self.absolute_data.get(&addr).copied(),
-            MaybeRelocatableAddr::Relocatable(Relocatable { segment, offset }) => self
+            MaybeRelocatableAddr::Relocatable(Relocatable { segment, offset }) => *self
                 .relocatable_data
-                .get(segment)
-                .and_then(|segment| segment.get(&offset).copied()),
+                .get(segment)?
+                .get(usize_from_u32(offset.0))?,
         }
     }
 }
@@ -114,6 +117,23 @@ fn validate_address(address: M31) {
     if address.0 > (1 << MAX_MEMORY_SIZE_BITS) {
         panic!("Max memory size is 2 ** {MAX_MEMORY_SIZE_BITS}; got address: {address}.")
     }
+}
+
+fn relocate_segment(
+    segment: Segment,
+    segment_info: &[Option<MaybeRelocatable<QM31>>],
+    table: &RelocationTable,
+) -> Vec<(M31, MaybeRelocatableValue)> {
+    segment_info
+        .iter()
+        .enumerate()
+        .filter_map(move |(offset, option_value)| {
+            option_value.as_ref().map(|value| {
+                let key = Relocatable::from((segment, u32_from_usize(offset)));
+                (key.relocate(table), value.relocate(table).into())
+            })
+        })
+        .collect()
 }
 
 #[cfg(test)]
