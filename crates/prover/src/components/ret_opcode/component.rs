@@ -50,11 +50,11 @@ impl FrameworkEval for Eval {
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         // PC column.
         let pc = eval.next_trace_mask();
-        eval.add_to_relation(&[RelationEntry::new(
+        eval.add_to_relation(RelationEntry::new(
             &self.memory_lookup,
             E::EF::one(),
             &[pc, RET_INSTRUCTION.into()],
-        )]);
+        ));
 
         let _ap = eval.next_trace_mask();
         let fp = eval.next_trace_mask();
@@ -62,20 +62,20 @@ impl FrameworkEval for Eval {
         // FP - 1
         let fp_minus_one = fp.clone() - E::F::one();
         let fp_minus_one_val = eval.next_trace_mask();
-        eval.add_to_relation(&[RelationEntry::new(
+        eval.add_to_relation(RelationEntry::new(
             &self.memory_lookup,
             E::EF::one(),
             &[fp_minus_one, fp_minus_one_val],
-        )]);
+        ));
 
         // FP - 2
         let fp_minus_two = fp - E::F::from(M31::from(2));
         let fp_minus_two_val = eval.next_trace_mask();
-        eval.add_to_relation(&[RelationEntry::new(
+        eval.add_to_relation(RelationEntry::new(
             &self.memory_lookup,
             E::EF::one(),
             &[fp_minus_two, fp_minus_two_val],
-        )]);
+        ));
 
         // TODO(giladchase): Add state lookups.
 

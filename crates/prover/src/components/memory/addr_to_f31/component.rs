@@ -55,11 +55,11 @@ impl FrameworkEval for Eval {
             std::array::from_fn(|_| eval.next_trace_mask());
         let multiplicity = eval.next_trace_mask();
 
-        eval.add_to_relation(&[RelationEntry::new(
+        eval.add_to_relation(RelationEntry::new(
             &self.lookup_elements,
             -E::EF::from(multiplicity),
             &id_and_value,
-        )]);
+        ));
 
         eval.finalize_logup();
 

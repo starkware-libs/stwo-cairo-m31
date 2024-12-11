@@ -67,7 +67,7 @@ impl FrameworkEval for Eval {
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         let state = std::array::from_fn(|_| eval.next_trace_mask());
         // Use initial state.
-        eval.add_to_relation(&[RelationEntry::new(&self.state_lookup, E::EF::one(), &state)]);
+        eval.add_to_relation(RelationEntry::new(&self.state_lookup, E::EF::one(), &state));
         let [ap, fp, pc] = state;
 
         // Assert flags are in range.
@@ -86,11 +86,11 @@ impl FrameworkEval for Eval {
             + E::F::from(M31(4)) * reg1
             + E::F::from(M31(12)) * reg2
             + E::F::from(M31(24)) * appp;
-        eval.add_to_relation(&[RelationEntry::new(
+        eval.add_to_relation(RelationEntry::new(
             &self.memory_lookup,
             E::EF::one(),
             &[pc, opcode, off0, off1, off2],
-        )]);
+        ));
 
         // Compute addresses.
         let [dst_address, lhs_address, rhs_address] =
@@ -107,23 +107,23 @@ impl FrameworkEval for Eval {
         let lhs_val_arr: [E::F; 4] = std::array::from_fn(|_| eval.next_trace_mask());
         let rhs_val_arr: [E::F; 4] = std::array::from_fn(|_| eval.next_trace_mask());
 
-        eval.add_to_relation(&[RelationEntry::new(
+        eval.add_to_relation(RelationEntry::new(
             &self.memory_lookup,
             E::EF::one(),
             &chain!([dst_address], dst_val_arr).collect_vec(),
-        )]);
+        ));
 
-        eval.add_to_relation(&[RelationEntry::new(
+        eval.add_to_relation(RelationEntry::new(
             &self.memory_lookup,
             E::EF::one(),
             &chain!([lhs_address], lhs_val_arr).collect_vec(),
-        )]);
+        ));
 
-        eval.add_to_relation(&[RelationEntry::new(
+        eval.add_to_relation(RelationEntry::new(
             &self.memory_lookup,
             E::EF::one(),
             &chain!([rhs_address], rhs_val_arr).collect_vec(),
-        )]);
+        ));
 
         let dst_val = E::combine_ef(dst_val_arr);
         let lhs_val = E::combine_ef(lhs_val_arr);
@@ -138,11 +138,11 @@ impl FrameworkEval for Eval {
 
         // Yield final state.
         let new_state = [ap + appp, fp, pc + E::F::one()];
-        eval.add_to_relation(&[RelationEntry::new(
+        eval.add_to_relation(RelationEntry::new(
             &self.state_lookup,
             -E::EF::one(),
             &new_state,
-        )]);
+        ));
 
         eval.finalize_logup();
         eval
