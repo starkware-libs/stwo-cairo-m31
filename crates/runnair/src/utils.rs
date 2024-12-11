@@ -24,7 +24,7 @@ pub(crate) fn usize_from_u32(value: u32) -> usize {
 
 // General utils.
 
-pub(crate) fn _maybe_resize<T: Clone>(vector: &mut Vec<T>, index: usize, default_value: T) {
+pub(crate) fn maybe_resize<T: Clone>(vector: &mut Vec<T>, index: usize, default_value: T) {
     let n_elements = vector.len();
 
     if index >= n_elements {
