@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::memory::relocatable::{MaybeRelocatable, Relocatable};
 use crate::memory::Memory;
+use crate::utils::usize_from_u32;
 use crate::vm::{qm31_from_hex_str_array, Input, State};
 
 // TODO: add custom (de)serialization.
@@ -44,7 +45,7 @@ impl HintRunner {
             panic!("`pc` must be a relocatable value.");
         };
 
-        let pc = usize::try_from(pc.0).unwrap();
+        let pc = usize_from_u32(pc.0);
         if let Some(Some(hint)) = self.pc_to_hint.get(pc) {
             hint.execute(memory, state, &self.input);
         }
