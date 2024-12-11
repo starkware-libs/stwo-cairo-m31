@@ -12,7 +12,7 @@ use stwo_prover::core::poly::circle::{CanonicCoset, CircleEvaluation};
 use stwo_prover::core::poly::BitReversedOrder;
 use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleChannel;
 
-use super::component::{Claim, InteractionClaim, RET_INSTRUCTION};
+use super::component::{Claim, InteractionClaim, INSTRUCTION_BASE};
 use crate::components::memory::addr_to_f31;
 use crate::components::ret_opcode::component::RET_N_TRACE_CELLS;
 use crate::input::instructions::VmState;
@@ -21,14 +21,14 @@ use crate::relations::MemoryRelation;
 const N_MEMORY_CALLS: usize = 3;
 
 // TODO(Ohad): take from prover_types and remove.
-pub struct PackedCasmState {
+pub struct PackedVmState {
     pub pc: PackedM31,
     pub ap: PackedM31,
     pub fp: PackedM31,
 }
 
 pub struct ClaimGenerator {
-    pub inputs: Vec<PackedCasmState>,
+    pub inputs: Vec<PackedVmState>,
 }
 impl ClaimGenerator {
     pub fn new(mut inputs: Vec<VmState>) -> Self {
@@ -41,7 +41,7 @@ impl ClaimGenerator {
         let inputs = inputs
             .into_iter()
             .array_chunks::<N_LANES>()
-            .map(|chunk| PackedCasmState {
+            .map(|chunk| PackedVmState {
                 pc: PackedM31::from_array(std::array::from_fn(|i| {
                     M31::from_u32_unchecked(chunk[i].pc)
                 })),
@@ -67,7 +67,7 @@ impl ClaimGenerator {
         });
         tree_builder.extend_evals(trace);
         let claim = Claim {
-            n_rets: self.inputs.len() * N_LANES,
+            n_calls: self.inputs.len() * N_LANES,
         };
         (claim, interaction_prover)
     }
@@ -131,7 +131,7 @@ impl InteractionClaimGenerator {
 }
 
 fn write_trace_simd(
-    inputs: &[PackedCasmState],
+    inputs: &[PackedVmState],
     memory_trace_generator: &addr_to_f31::ClaimGenerator,
 ) -> (
     Vec<CircleEvaluation<SimdBackend, M31, BitReversedOrder>>,
@@ -175,7 +175,7 @@ fn write_trace_simd(
 // TODO(Ohad): redo when air team decides how it should look.
 fn write_trace_row(
     dst: &mut [Col<SimdBackend, M31>],
-    ret_opcode_input: &PackedCasmState,
+    ret_opcode_input: &PackedVmState,
     row_index: usize,
     lookup_data: &mut InteractionClaimGenerator,
     memory_trace_generator: &addr_to_f31::ClaimGenerator,
@@ -190,7 +190,7 @@ fn write_trace_row(
 
     lookup_data.memory_inputs[0].push(col0_pc);
     lookup_data.memory_inputs[1].push((col2_fp) - (PackedM31::broadcast(M31::one())));
-    lookup_data.memory_outputs[0].push(PackedM31::broadcast(RET_INSTRUCTION));
+    lookup_data.memory_outputs[0].push(PackedM31::broadcast(INSTRUCTION_BASE));
     let mem_fp_minus_one =
         memory_trace_generator.deduce_output((col2_fp) - (PackedM31::broadcast(M31::one())));
     lookup_data.memory_outputs[1].push(mem_fp_minus_one);

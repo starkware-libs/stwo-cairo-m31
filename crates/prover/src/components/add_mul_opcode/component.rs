@@ -19,15 +19,15 @@ pub const INSTRUCTION_BASE: M31 = M31::from_u32_unchecked(0);
 
 // TODO(alont) put these in a common file.
 pub const IMM_BASE: M31 = M31::from_u32_unchecked(1 << 29);
-pub const TWO_INV: M31 = M31(2).inverse();
 // TODO(alont) document this!!
-pub fn select_trit<E: EvalAtRow>(trit: E::F, a: E::F, b: E::F, c: E::F) -> E::F {
-    let trit_minus_one = trit - E::F::one();
-    let trit_minus_two = trit - E::F::from(M31(2));
-    let two_inv = E::F::from(TWO_INV);
+pub fn select_trit<E: EvalAtRow>(trit: E::F, a: &E::F, b: &E::F, c: &E::F) -> E::F {
+    let trit_minus_one = trit.clone() - E::F::one();
+    let trit_minus_two = trit.clone() - E::F::from(M31(2));
+    let two_inv = E::F::from(M31(2).inverse());
 
-    (two_inv * trit_minus_one * trit_minus_two * a) + (two_inv * trit * trit_minus_one * b)
-        - (trit * trit_minus_two * c)
+    (two_inv.clone() * trit_minus_one.clone() * trit_minus_two.clone() * a.clone())
+        + (two_inv * trit.clone() * trit_minus_one * b.clone())
+        - (trit * trit_minus_two * c.clone())
 }
 
 pub type Component = FrameworkComponent<Eval>;
@@ -72,34 +72,53 @@ impl FrameworkEval for Eval {
 
         // Assert flags are in range.
         let [is_mul, reg0, reg1, reg2, appp] = std::array::from_fn(|_| eval.next_trace_mask());
-        eval.add_constraint(is_mul * is_mul - is_mul);
-        eval.add_constraint(reg0 * reg0 - reg0);
-        eval.add_constraint(reg2 * reg2 - reg2);
-        eval.add_constraint(appp * appp - appp);
-        eval.add_constraint((reg1 - E::F::from(M31(2))) * (reg1 - E::F::one()) * reg1);
+        eval.add_constraint(is_mul.clone() * is_mul.clone() - is_mul.clone());
+        eval.add_constraint(reg0.clone() * reg0.clone() - reg0.clone());
+        eval.add_constraint(reg2.clone() * reg2.clone() - reg2.clone());
+        eval.add_constraint(appp.clone() * appp.clone() - appp.clone());
+        eval.add_constraint(
+            (reg1.clone() - E::F::from(M31(2))) * (reg1.clone() - E::F::one()) * reg1.clone(),
+        );
 
         // Check instruction.
         let [off0, off1, off2] = std::array::from_fn(|_| eval.next_trace_mask());
         let opcode = E::F::from(INSTRUCTION_BASE)
-            + is_mul
-            + E::F::from(M31(2)) * reg0
-            + E::F::from(M31(4)) * reg1
-            + E::F::from(M31(12)) * reg2
-            + E::F::from(M31(24)) * appp;
+            + is_mul.clone()
+            + E::F::from(M31(2)) * reg0.clone()
+            + E::F::from(M31(4)) * reg1.clone()
+            + E::F::from(M31(12)) * reg2.clone()
+            + E::F::from(M31(24)) * appp.clone();
         eval.add_to_relation(RelationEntry::new(
             &self.memory_lookup,
             E::EF::one(),
-            &[pc, opcode, off0, off1, off2],
+            &[
+                pc.clone(),
+                opcode.clone(),
+                off0.clone(),
+                off1.clone(),
+                off2.clone(),
+            ],
         ));
 
         // Compute addresses.
         let [dst_address, lhs_address, rhs_address] =
             std::array::from_fn(|_| eval.next_trace_mask());
 
-        eval.add_constraint(dst_address - (reg0 * fp + (E::F::one() - reg0) * ap + off0));
-        eval.add_constraint(rhs_address - (reg2 * fp + (E::F::one() - reg2) * ap + off2));
         eval.add_constraint(
-            lhs_address - (select_trit::<E>(reg1, ap, fp, E::F::from(IMM_BASE)) + off1),
+            dst_address.clone()
+                - (reg0.clone() * fp.clone()
+                    + (E::F::one() - reg0.clone()) * ap.clone()
+                    + off0.clone()),
+        );
+        eval.add_constraint(
+            rhs_address.clone()
+                - (reg2.clone() * fp.clone()
+                    + (E::F::one() - reg2.clone()) * ap.clone()
+                    + off2.clone()),
+        );
+        eval.add_constraint(
+            lhs_address.clone()
+                - (select_trit::<E>(reg1.clone(), &ap, &fp, &E::F::from(IMM_BASE)) + off1.clone()),
         );
 
         // Read memory.
@@ -110,19 +129,19 @@ impl FrameworkEval for Eval {
         eval.add_to_relation(RelationEntry::new(
             &self.memory_lookup,
             E::EF::one(),
-            &chain!([dst_address], dst_val_arr).collect_vec(),
+            &chain!([dst_address], dst_val_arr.clone()).collect_vec(),
         ));
 
         eval.add_to_relation(RelationEntry::new(
             &self.memory_lookup,
             E::EF::one(),
-            &chain!([lhs_address], lhs_val_arr).collect_vec(),
+            &chain!([lhs_address], lhs_val_arr.clone()).collect_vec(),
         ));
 
         eval.add_to_relation(RelationEntry::new(
             &self.memory_lookup,
             E::EF::one(),
-            &chain!([rhs_address], rhs_val_arr).collect_vec(),
+            &chain!([rhs_address], rhs_val_arr.clone()).collect_vec(),
         ));
 
         let dst_val = E::combine_ef(dst_val_arr);
@@ -132,8 +151,9 @@ impl FrameworkEval for Eval {
         // Apply operation.
         eval.add_constraint(
             dst_val
-                - ((E::EF::from(is_mul) * lhs_val * rhs_val)
-                    + (E::EF::one() - E::EF::from(is_mul)) * (lhs_val + rhs_val)),
+                - ((E::EF::from(is_mul.clone()) * lhs_val.clone() * rhs_val.clone())
+                    + (E::EF::one() - E::EF::from(is_mul.clone()))
+                        * (lhs_val.clone() + rhs_val.clone())),
         );
 
         // Yield final state.
@@ -144,7 +164,7 @@ impl FrameworkEval for Eval {
             &new_state,
         ));
 
-        eval.finalize_logup();
+        eval.finalize_logup_in_pairs();
         eval
     }
 }
@@ -160,13 +180,13 @@ impl Claim {
 
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
         let log_size = self.n_calls.next_power_of_two().ilog2();
-        let interaction_0_log_sizes = vec![log_size; N_TRACE_CELLS];
-        let interaction_1_log_sizes = vec![log_size; SECURE_EXTENSION_DEGREE * 3];
-        let fixed_log_sizes = vec![log_size];
+        let preprocessed_log_sizes = vec![log_size];
+        let interaction_1_log_sizes = vec![log_size; N_TRACE_CELLS];
+        let interaction_2_log_sizes = vec![log_size; SECURE_EXTENSION_DEGREE * 3];
         TreeVec::new(vec![
-            interaction_0_log_sizes,
+            preprocessed_log_sizes,
             interaction_1_log_sizes,
-            fixed_log_sizes,
+            interaction_2_log_sizes,
         ])
     }
 }
