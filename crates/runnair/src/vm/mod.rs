@@ -25,6 +25,7 @@ use self::jmp::*;
 use self::jnz::*;
 use crate::memory::relocatable::{MaybeRelocatable, Relocatable, Segment};
 use crate::memory::{MaybeRelocatableAddr, Memory};
+use crate::utils::{get_tests_data_dir, m31_from_hex_str, u32_from_usize};
 
 // TODO: reconsider input type and parsing.
 pub(crate) type Input = serde_json::Value;
@@ -181,7 +182,7 @@ impl VM {
                     let encoded_instruction =
                         QM31::from_m31_array([instruction.op, args[0], args[1], args[2]]);
                     let instruction_address =
-                        Relocatable::from((program_segment, u32::try_from(index).unwrap()));
+                        Relocatable::from((program_segment, u32_from_usize(index)));
 
                     (instruction_address, encoded_instruction)
                 });
@@ -462,25 +463,7 @@ pub(crate) fn resolve_addresses<const N: usize>(
     })
 }
 
-pub(crate) fn m31_from_hex_str(x: &str) -> M31 {
-    M31(u32::from_str_radix(x.trim_start_matches("0x"), 16).unwrap())
-}
-
-pub(crate) fn qm31_from_hex_str_array(x: [&str; 4]) -> QM31 {
-    let m31_array = x.map(m31_from_hex_str);
-    QM31::from_m31_array(m31_array)
-}
-
-pub(crate) fn get_crate_dir() -> PathBuf {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest_dir.to_path_buf()
-}
-
-pub(crate) fn get_tests_data_dir() -> PathBuf {
-    get_crate_dir().join("tests").join("data")
-}
-
-pub fn run_fibonacci() {
+pub(crate) fn run_fibonacci() {
     let program_path = get_tests_data_dir().join("fibonacci_compiled.json");
     let program = Program::from_compiled_file(program_path);
     let input = serde_json::json!({ "fibonacci_claim_index": ["0x64", "0x0", "0x0", "0x0"]});
