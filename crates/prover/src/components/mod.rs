@@ -8,7 +8,6 @@ pub const LOOKUP_INTERACTION_PHASE: usize = 1;
 mod tests {
     use itertools::Itertools;
     use num_traits::One;
-    use stwo_prover::core::backend::simd::m31::PackedM31;
     use stwo_prover::core::backend::simd::SimdBackend;
     use stwo_prover::core::channel::Blake2sChannel;
     use stwo_prover::core::fields::m31::M31;

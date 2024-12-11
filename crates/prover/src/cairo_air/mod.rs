@@ -23,6 +23,7 @@ use crate::components::memory::addr_to_f31;
 use crate::components::ret_opcode;
 use crate::input::instructions::VmState;
 use crate::input::CairoInput;
+use crate::relations::MemoryRelation;
 
 #[derive(Serialize, Deserialize)]
 pub struct CairoProof<H: MerkleHasher> {
@@ -59,13 +60,13 @@ impl CairoClaim {
 }
 
 pub struct CairoInteractionElements {
-    pub memory_id_to_value_lookup: addr_to_f31::MemoryRelation,
+    pub memory_id_to_value_lookup: MemoryRelation,
     // ...
 }
 impl CairoInteractionElements {
     pub fn draw(channel: &mut impl Channel) -> CairoInteractionElements {
         CairoInteractionElements {
-            memory_id_to_value_lookup: addr_to_f31::MemoryRelation::draw(channel),
+            memory_id_to_value_lookup: MemoryRelation::draw(channel),
         }
     }
 }

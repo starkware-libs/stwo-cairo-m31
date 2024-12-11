@@ -6,10 +6,9 @@ use stwo_prover::core::channel::Channel;
 use stwo_prover::core::fields::qm31::{SecureField, QM31};
 use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
 use stwo_prover::core::pcs::TreeVec;
-use stwo_prover::relation;
 
-pub const MEMORY_ID_SIZE: usize = 1;
-pub const VALUE_SIZE: usize = 4;
+use crate::relations::{MemoryRelation, MEMORY_ID_SIZE, VALUE_SIZE};
+
 pub const N_ADDR_AND_VALUE_COLUMNS: usize = MEMORY_ID_SIZE + VALUE_SIZE;
 pub const MULTIPLICITY_COLUMN_OFFSET: usize = N_ADDR_AND_VALUE_COLUMNS;
 pub const N_MULTIPLICITY_COLUMNS: usize = 1;
@@ -17,9 +16,6 @@ pub const N_MULTIPLICITY_COLUMNS: usize = 1;
 pub const N_COLUMNS: usize = N_ADDR_AND_VALUE_COLUMNS + N_MULTIPLICITY_COLUMNS;
 
 pub type Component = FrameworkComponent<Eval>;
-
-const N_MEMORY_ELEMS: usize = MEMORY_ID_SIZE + VALUE_SIZE;
-relation!(MemoryRelation, N_MEMORY_ELEMS);
 
 /// IDs are continuous and start from 0.
 #[derive(Clone)]

@@ -13,9 +13,10 @@ use stwo_prover::core::poly::BitReversedOrder;
 use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleChannel;
 
 use super::component::{Claim, InteractionClaim, RET_INSTRUCTION};
-use crate::components::memory::addr_to_f31::{self, MemoryRelation};
+use crate::components::memory::addr_to_f31;
 use crate::components::ret_opcode::component::RET_N_TRACE_CELLS;
 use crate::input::instructions::VmState;
+use crate::relations::MemoryRelation;
 
 const N_MEMORY_CALLS: usize = 3;
 
