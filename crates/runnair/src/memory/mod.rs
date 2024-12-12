@@ -14,7 +14,7 @@ pub type MaybeRelocatableAddr = MaybeRelocatable<M31>;
 pub type MaybeRelocatableValue = MaybeRelocatable<QM31>;
 
 // TODO: confirm this limit.
-const MAX_MEMORY_SIZE_BITS: u8 = 30;
+pub(crate) const MAX_MEMORY_SIZE_BITS: Segment = 30;
 
 #[derive(Clone, Debug, Default)]
 pub struct Memory {
