@@ -166,7 +166,7 @@
                 "hints": [
                     {
                         "location": {
-                            "end_col": 25,
+                            "end_col": 59,
                             "end_line": 7,
                             "input_file": {
                                 "filename": "fibonacci.cairo"
@@ -698,7 +698,7 @@
                     "__main__",
                     "__main__.main"
                 ],
-                "code": "\"FibonacciIndex\"",
+                "code": "memory[state.fp] = input['fibonacci_claim_index'];",
                 "flow_tracking_data": {
                     "ap_tracking": {
                         "group": 0,
