@@ -112,8 +112,9 @@ impl TryFrom<ProgramRaw> for Program {
             .into_iter()
             .filter_map(|(pc, hints_at_pc)| {
                 let pc = usize::from_str_radix(&pc, 16).unwrap();
-                let code = hints_at_pc.as_array()?.first()?.get("code")?.as_str()?;
-                Some((pc, serde_json::from_str(code).ok()?))
+                let code = hints_at_pc.as_array()?.first()?.get("code")?;
+                // TODO: reconsider this clone.
+                Some((pc, serde_json::from_value(code.clone()).ok()?))
             });
 
         let mut hints = Hints::new();
