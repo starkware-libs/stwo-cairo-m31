@@ -11,6 +11,7 @@ use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
 use stwo_prover::core::fields::FieldExpOps;
 use stwo_prover::core::pcs::TreeVec;
 
+use crate::components::utils::{get_bit_constraint, get_trit_constraint};
 use crate::relations::{MemoryRelation, StateRelation};
 
 pub const N_TRACE_COLUMNS: usize = 26;
@@ -72,13 +73,11 @@ impl FrameworkEval for Eval {
 
         // Assert flags are in range.
         let [is_mul, reg0, reg1, reg2, appp] = std::array::from_fn(|_| eval.next_trace_mask());
-        eval.add_constraint(is_mul.clone() * is_mul.clone() - is_mul.clone());
-        eval.add_constraint(reg0.clone() * reg0.clone() - reg0.clone());
-        eval.add_constraint(reg2.clone() * reg2.clone() - reg2.clone());
-        eval.add_constraint(appp.clone() * appp.clone() - appp.clone());
-        eval.add_constraint(
-            (reg1.clone() - E::F::from(M31(2))) * (reg1.clone() - E::F::one()) * reg1.clone(),
-        );
+        eval.add_constraint(get_bit_constraint::<E>(is_mul));
+        eval.add_constraint(get_bit_constraint::<E>(reg0));
+        eval.add_constraint(get_bit_constraint::<E>(reg2));
+        eval.add_constraint(get_bit_constraint::<E>(appp));
+        eval.add_constraint(get_trit_constraint::<E>(reg1));
 
         // Check instruction.
         let [off0, off1, off2] = std::array::from_fn(|_| eval.next_trace_mask());

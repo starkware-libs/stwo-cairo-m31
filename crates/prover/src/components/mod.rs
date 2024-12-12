@@ -1,6 +1,8 @@
 pub mod add_mul_opcode;
+pub mod call_opcode;
 pub mod memory;
 pub mod ret_opcode;
+pub mod utils;
 
 // TODO(ShaharS): Move to a common file.
 pub const LOOKUP_INTERACTION_PHASE: usize = 1;
