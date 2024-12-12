@@ -13,7 +13,7 @@ use stwo_prover::core::pcs::TreeVec;
 
 use crate::relations::{MemoryRelation, StateRelation};
 
-pub const N_TRACE_CELLS: usize = 26;
+pub const N_TRACE_COLUMNS: usize = 26;
 // TODO(alont): set instruction bases to not overlap
 pub const INSTRUCTION_BASE: M31 = M31::from_u32_unchecked(0);
 
@@ -68,7 +68,7 @@ impl FrameworkEval for Eval {
         let state = std::array::from_fn(|_| eval.next_trace_mask());
         // Use initial state.
         eval.add_to_relation(RelationEntry::new(&self.state_lookup, E::EF::one(), &state));
-        let [ap, fp, pc] = state;
+        let [pc, ap, fp] = state;
 
         // Assert flags are in range.
         let [is_mul, reg0, reg1, reg2, appp] = std::array::from_fn(|_| eval.next_trace_mask());
@@ -157,7 +157,7 @@ impl FrameworkEval for Eval {
         );
 
         // Yield final state.
-        let new_state = [ap + appp, fp, pc + E::F::one()];
+        let new_state = [pc + E::F::one(), ap + appp, fp];
         eval.add_to_relation(RelationEntry::new(
             &self.state_lookup,
             -E::EF::one(),
@@ -181,7 +181,7 @@ impl Claim {
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
         let log_size = self.n_calls.next_power_of_two().ilog2();
         let preprocessed_log_sizes = vec![log_size];
-        let interaction_1_log_sizes = vec![log_size; N_TRACE_CELLS];
+        let interaction_1_log_sizes = vec![log_size; N_TRACE_COLUMNS];
         let interaction_2_log_sizes = vec![log_size; SECURE_EXTENSION_DEGREE * 3];
         TreeVec::new(vec![
             preprocessed_log_sizes,

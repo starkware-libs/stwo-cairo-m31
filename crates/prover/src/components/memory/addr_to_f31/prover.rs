@@ -20,6 +20,7 @@ use crate::input::mem::{Memory, MemoryValue};
 use crate::relations::MemoryRelation;
 
 pub struct ClaimGenerator {
+    // TODO(gilad): change this and the rest of write_trace to QM31.
     pub values: Vec<PackedM31>,
     pub multiplicities: Vec<u32>,
 }
