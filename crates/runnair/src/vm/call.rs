@@ -59,28 +59,12 @@ macro_rules! define_call {
     };
 }
 
-macro_rules! define_call_imm {
-    ($type:ident) => {
-        paste! {
-            pub(crate) fn [<call_ $type _imm>] (
-                memory: &mut Memory,
-                state: State,
-                args: InstructionArgs,
-            ) -> State {
-                push_return_fp_and_pc(memory, state);
-                let immediate = args[0];
-                [<call_ $type>](state, immediate)
-            }
-        }
-    };
-}
-
 define_call!(abs, ap);
 define_call!(abs, fp);
+define_call!(abs, imm);
 define_call!(rel, ap);
 define_call!(rel, fp);
-define_call_imm!(abs);
-define_call_imm!(rel);
+define_call!(rel, imm);
 
 pub(crate) fn ret(memory: &mut Memory, state: State, _args: InstructionArgs) -> State {
     let Some(fp) = memory.get(state.fp - M31(2)) else {
