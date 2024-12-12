@@ -8,6 +8,7 @@ use crate::vm::{Input, State};
 // TODO: add custom (de)serialization.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum Hint {
+    #[serde(rename = "memory[state.fp] = input['fibonacci_claim_index'];")]
     FibonacciIndex,
 }
 
