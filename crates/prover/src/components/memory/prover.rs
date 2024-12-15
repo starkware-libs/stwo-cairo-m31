@@ -15,7 +15,7 @@ use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleChannel;
 use super::component::{
     Claim, InteractionClaim, MULTIPLICITY_COLUMN_OFFSET, N_ADDR_AND_VALUE_COLUMNS, N_COLUMNS,
 };
-use super::MemoryRelation;
+use crate::components::memory::component::MemoryRelation;
 use crate::components::memory::MEMORY_ADDRESS_BOUND;
 use crate::input::mem::{Memory, MemoryValue};
 
