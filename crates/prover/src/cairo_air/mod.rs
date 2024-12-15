@@ -19,7 +19,8 @@ use stwo_prover::core::vcs::ops::MerkleHasher;
 use thiserror::Error;
 use tracing::{span, Level};
 
-use crate::components::memory::addr_to_f31;
+use crate::components::memory::component::{Claim, InteractionClaim, MemoryRelation};
+use crate::components::memory::{ClaimGenerator, Component as MemoryComponent, Eval};
 use crate::input::instructions::VmState;
 use crate::input::CairoInput;
 
@@ -37,7 +38,7 @@ pub struct CairoClaim {
     pub initial_state: VmState,
     pub final_state: VmState,
 
-    pub memory_id_to_value: addr_to_f31::Claim,
+    pub memory_id_to_value: Claim,
     // ...
 }
 
@@ -53,20 +54,20 @@ impl CairoClaim {
 }
 
 pub struct CairoInteractionElements {
-    memory_id_to_value_lookup: addr_to_f31::MemoryRelation,
+    memory_id_to_value_lookup: MemoryRelation,
     // ...
 }
 impl CairoInteractionElements {
     pub fn draw(channel: &mut impl Channel) -> CairoInteractionElements {
         CairoInteractionElements {
-            memory_id_to_value_lookup: addr_to_f31::MemoryRelation::draw(channel),
+            memory_id_to_value_lookup: MemoryRelation::draw(channel),
         }
     }
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct CairoInteractionClaim {
-    pub memory_id_to_value: addr_to_f31::InteractionClaim,
+    pub memory_id_to_value: InteractionClaim,
     // ...
 }
 
@@ -100,7 +101,7 @@ pub fn lookup_sum_valid(
 }
 
 pub struct CairoComponents {
-    memory_id_to_value: addr_to_f31::Component,
+    memory_id_to_value: MemoryComponent,
     // ...
 }
 
@@ -112,9 +113,9 @@ impl CairoComponents {
     ) -> Self {
         let tree_span_provider = &mut TraceLocationAllocator::default();
 
-        let memory_id_to_value_component = addr_to_f31::Component::new(
+        let memory_id_to_value_component = MemoryComponent::new(
             tree_span_provider,
-            addr_to_f31::Eval::new(
+            Eval::new(
                 cairo_claim.memory_id_to_value.clone(),
                 interaction_elements.memory_id_to_value_lookup.clone(),
                 interaction_claim.memory_id_to_value.clone(),
@@ -164,7 +165,7 @@ pub fn prove_cairo(input: CairoInput) -> Result<CairoProof<Blake2sMerkleHasher>,
 
     // Base trace.
     // TODO(Ohad): change to OpcodeClaimProvers, and integrate padding.
-    let mut memory_id_to_value_trace_generator = addr_to_f31::ClaimGenerator::new(&input.mem);
+    let mut memory_id_to_value_trace_generator = ClaimGenerator::new(&input.mem);
 
     // Add public memory.
     // TODO(ShaharS): fix the use of public memory to support memory ids.
