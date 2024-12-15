@@ -3,7 +3,7 @@ use stwo_prover::constraint_framework::logup::LogupTraceGenerator;
 use stwo_prover::constraint_framework::Relation;
 use stwo_prover::core::backend::simd::column::BaseColumn;
 use stwo_prover::core::backend::simd::m31::{PackedBaseField, PackedM31, LOG_N_LANES, N_LANES};
-use stwo_prover::core::backend::simd::qm31::PackedQM31;
+use stwo_prover::core::backend::simd::qm31::PackedSecureField;
 use stwo_prover::core::backend::simd::SimdBackend;
 use stwo_prover::core::backend::{Col, Column};
 use stwo_prover::core::fields::m31::{BaseField, M31};
@@ -20,7 +20,7 @@ use crate::components::memory::MEMORY_ADDRESS_BOUND;
 use crate::input::mem::{Memory, MemoryValue};
 
 pub struct ClaimGenerator {
-    pub values: Vec<PackedM31>,
+    pub values: Vec<PackedSecureField>,
     pub multiplicities: Vec<u32>,
 }
 impl ClaimGenerator {
@@ -37,18 +37,22 @@ impl ClaimGenerator {
 
         let values = values
             .into_iter()
+            .map(|mem_value| mem_value.0)
             .array_chunks::<N_LANES>()
-            .flat_map(|chunk| -> [PackedM31; 4] {
-                std::array::from_fn(|i| {
-                    PackedM31::from_array(std::array::from_fn(|j| chunk[j].0.to_m31_array()[i]))
-                })
-            })
+            .map(PackedSecureField::from_array)
             .collect_vec();
         let multiplicities = vec![0; size];
         Self {
             values,
             multiplicities,
         }
+    }
+
+    pub fn deduce_output(&self, input: PackedM31) -> PackedSecureField {
+        let indices = input.to_array().map(|i| i.0 as usize);
+        PackedSecureField::from_array(
+            indices.map(|i| self.values[i / N_LANES].to_array()[i % N_LANES]),
+        )
     }
 
     pub fn add_inputs(&mut self, memory_index: usize) {
@@ -67,12 +71,14 @@ impl ClaimGenerator {
         let inc = PackedBaseField::from_array(std::array::from_fn(|i| {
             M31::from_u32_unchecked((i) as u32)
         }));
-        for (i, value) in self.values.iter().enumerate() {
+        for (i, values) in self.values.iter().enumerate() {
             // TODO(AlonH): Either create a constant column for the addresses and remove it from
             // here or add constraints to the column here.
             trace[0].data[i] =
                 PackedM31::broadcast(M31::from_u32_unchecked((i * N_LANES) as u32)) + inc;
-            trace[1].data[i] = *value;
+            for (j, value) in values.into_packed_m31s().into_iter().enumerate() {
+                trace[j + 1].data[i] = value;
+            }
         }
         trace[MULTIPLICITY_COLUMN_OFFSET] = BaseColumn::from_iter(
             self.multiplicities
@@ -137,7 +143,7 @@ impl InteractionClaimGenerator {
         for vec_row in 0..1 << (log_size - LOG_N_LANES) {
             let values: [PackedM31; N_ADDR_AND_VALUE_COLUMNS] =
                 std::array::from_fn(|i| self.ids_and_values[i][vec_row]);
-            let denom: PackedQM31 = lookup_elements.combine(&values);
+            let denom: PackedSecureField = lookup_elements.combine(&values);
             col_gen.write_frac(vec_row, (-self.multiplicities[vec_row]).into(), denom);
         }
         col_gen.finalize_col();
@@ -148,6 +154,3 @@ impl InteractionClaimGenerator {
         InteractionClaim { claimed_sum }
     }
 }
-
-// del rangecheck, split, redudnet stuff, small
-// u32 -> m31
