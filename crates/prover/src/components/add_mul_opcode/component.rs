@@ -8,27 +8,15 @@ use stwo_prover::core::channel::Channel;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::SecureField;
 use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
-use stwo_prover::core::fields::FieldExpOps;
 use stwo_prover::core::pcs::TreeVec;
 
 use crate::relations::{MemoryRelation, StateRelation};
+use crate::utils::component::decode_opcode;
+use crate::utils::select_by_bit;
 
 pub const N_TRACE_COLUMNS: usize = 26;
 // TODO(alont): set instruction bases to not overlap
 pub const INSTRUCTION_BASE: M31 = M31::from_u32_unchecked(0);
-
-// TODO(alont) put these in a common file.
-pub const IMM_BASE: M31 = M31::from_u32_unchecked(1 << 29);
-// TODO(alont) document this!!
-pub fn select_trit<E: EvalAtRow>(trit: E::F, a: &E::F, b: &E::F, c: &E::F) -> E::F {
-    let trit_minus_one = trit.clone() - E::F::one();
-    let trit_minus_two = trit.clone() - E::F::from(M31(2));
-    let two_inv = E::F::from(M31(2).inverse());
-
-    (two_inv.clone() * trit_minus_one.clone() * trit_minus_two.clone() * a.clone())
-        + (two_inv * trit.clone() * trit_minus_one * b.clone())
-        - (trit * trit_minus_two * c.clone())
-}
 
 pub type Component = FrameworkComponent<Eval>;
 
@@ -74,20 +62,23 @@ impl FrameworkEval for Eval {
         let [is_mul, reg0, reg1, reg2, appp] = std::array::from_fn(|_| eval.next_trace_mask());
         eval.add_constraint(is_mul.clone() * is_mul.clone() - is_mul.clone());
         eval.add_constraint(reg0.clone() * reg0.clone() - reg0.clone());
+        eval.add_constraint(reg1.clone() * reg1.clone() - reg1.clone());
         eval.add_constraint(reg2.clone() * reg2.clone() - reg2.clone());
         eval.add_constraint(appp.clone() * appp.clone() - appp.clone());
-        eval.add_constraint(
-            (reg1.clone() - E::F::from(M31(2))) * (reg1.clone() - E::F::one()) * reg1.clone(),
-        );
 
         // Check instruction.
         let [off0, off1, off2] = std::array::from_fn(|_| eval.next_trace_mask());
-        let opcode = E::F::from(INSTRUCTION_BASE)
-            + is_mul.clone()
-            + E::F::from(M31(2)) * reg0.clone()
-            + E::F::from(M31(4)) * reg1.clone()
-            + E::F::from(M31(12)) * reg2.clone()
-            + E::F::from(M31(24)) * appp.clone();
+        let opcode = decode_opcode::<E>(
+            INSTRUCTION_BASE.into(),
+            &[
+                (is_mul.clone(), 2),
+                (reg0.clone(), 2),
+                (reg1.clone(), 2),
+                (reg2.clone(), 2),
+                (appp.clone(), 2),
+            ],
+        );
+
         eval.add_to_relation(RelationEntry::new(
             &self.memory_lookup,
             E::EF::one(),
@@ -106,19 +97,15 @@ impl FrameworkEval for Eval {
 
         eval.add_constraint(
             dst_address.clone()
-                - (reg0.clone() * fp.clone()
-                    + (E::F::one() - reg0.clone()) * ap.clone()
-                    + off0.clone()),
+                - (select_by_bit(reg0.clone(), ap.clone(), fp.clone()) + off0.clone()),
         );
         eval.add_constraint(
-            rhs_address.clone()
-                - (reg2.clone() * fp.clone()
-                    + (E::F::one() - reg2.clone()) * ap.clone()
-                    + off2.clone()),
+            dst_address.clone()
+                - (select_by_bit(reg1.clone(), ap.clone(), fp.clone()) + off1.clone()),
         );
         eval.add_constraint(
-            lhs_address.clone()
-                - (select_trit::<E>(reg1.clone(), &ap, &fp, &E::F::from(IMM_BASE)) + off1.clone()),
+            dst_address.clone()
+                - (select_by_bit(reg2.clone(), ap.clone(), fp.clone()) + off2.clone()),
         );
 
         // Read memory.
@@ -151,9 +138,11 @@ impl FrameworkEval for Eval {
         // Apply operation.
         eval.add_constraint(
             dst_val
-                - ((E::EF::from(is_mul.clone()) * lhs_val.clone() * rhs_val.clone())
-                    + (E::EF::one() - E::EF::from(is_mul.clone()))
-                        * (lhs_val.clone() + rhs_val.clone())),
+                - (select_by_bit(
+                    E::EF::from(is_mul),
+                    lhs_val.clone() + rhs_val.clone(),
+                    lhs_val.clone() * rhs_val.clone(),
+                )),
         );
 
         // Yield final state.

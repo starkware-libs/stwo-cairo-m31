@@ -1,25 +1,24 @@
-use std::simd::Simd;
-
 use itertools::{zip_eq, Itertools};
 use num_traits::{One, Zero};
 use stwo_prover::constraint_framework::logup::LogupTraceGenerator;
-use stwo_prover::constraint_framework::{Relation, SimdDomainEvaluator};
+use stwo_prover::constraint_framework::Relation;
 use stwo_prover::core::backend::simd::m31::{PackedM31, LOG_N_LANES, N_LANES};
 use stwo_prover::core::backend::simd::qm31::PackedQM31;
 use stwo_prover::core::backend::simd::SimdBackend;
 use stwo_prover::core::backend::{Col, Column};
 use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fields::FieldExpOps;
 use stwo_prover::core::pcs::TreeBuilder;
 use stwo_prover::core::poly::circle::{CanonicCoset, CircleEvaluation};
 use stwo_prover::core::poly::BitReversedOrder;
 use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleChannel;
 
 use super::component::{Claim, InteractionClaim, INSTRUCTION_BASE};
-use crate::components::add_mul_opcode::component::{IMM_BASE, N_TRACE_COLUMNS};
+use crate::components::add_mul_opcode::component::N_TRACE_COLUMNS;
 use crate::components::memory::addr_to_f31;
 use crate::input::instructions::VmState;
 use crate::relations::{MemoryRelation, StateRelation, N_MEMORY_ELEMS, STATE_SIZE};
+use crate::utils::prover::decode_opcode;
+use crate::utils::select_by_bit;
 
 const N_MEMORY_LOOKUPS: usize = 4;
 const N_STATE_LOOKUPS: usize = 2;
@@ -186,29 +185,8 @@ fn write_trace_simd(
     (trace, sub_components_inputs)
 }
 
-// TODO(alont) put these in a common place.
-pub fn select_trit(trit: PackedM31, a: PackedM31, b: PackedM31, c: PackedM31) -> PackedM31 {
-    let trit_minus_one = trit - PackedM31::one();
-    let trit_minus_two = trit - PackedM31::broadcast(M31(2));
-    let two_inv = PackedM31::broadcast(M31(2).inverse());
-
-    (two_inv * trit_minus_one * trit_minus_two * a) + (two_inv * trit * trit_minus_one * b)
-        - (trit * trit_minus_two * c)
-}
-
-pub fn divmod(x: PackedM31, divisor: u32) -> (PackedM31, PackedM31) {
-    unsafe {
-        let simd_x = x.into_simd();
-        (
-            PackedM31::from_simd_unchecked(simd_x / Simd::splat(divisor)),
-            PackedM31::from_simd_unchecked(simd_x % Simd::splat(divisor)),
-        )
-    }
-}
-
 // Add / Mul trace row:
 // | State (3) | flags (5) | offsets (3) | addrs (3) | values (3 * 4) |
-// TODO(Ohad): redo when air team decides how it should look.
 fn write_trace_row(
     trace: &mut [Col<SimdBackend, M31>],
     input: &PackedVmState,
@@ -232,14 +210,7 @@ fn write_trace_row(
     ];
     interaction_claim_generator.memory[0].push([input.pc, opcode, off0, off1, off2]);
 
-    let flags = opcode - PackedM31::broadcast(INSTRUCTION_BASE);
-
-    let (flags, is_mul) = divmod(flags, 2);
-    let (flags, reg0) = divmod(flags, 2);
-    let (flags, reg1) = divmod(flags, 3);
-    let (flags, reg2) = divmod(flags, 2);
-    let (flags, appp) = divmod(flags, 2);
-    assert!(flags.is_zero(), "Too many flags.");
+    let [is_mul, reg0, reg1, reg2, appp] = decode_opcode(INSTRUCTION_BASE, opcode, [2, 2, 2, 2, 2]);
 
     trace[3].data[row_index] = is_mul;
     trace[4].data[row_index] = reg0;
@@ -253,9 +224,9 @@ fn write_trace_row(
     trace[10].data[row_index] = off2;
 
     // Addresses
-    let dst_addr = (reg0 * input.fp) + (PackedM31::one() - reg0) * input.ap + off0;
-    let lhs_addr = select_trit(reg1, input.ap, input.fp, PackedM31::broadcast(IMM_BASE)) + off1;
-    let rhs_addr = (reg2 * input.fp) + (PackedM31::one() - reg2) * input.ap + off2;
+    let dst_addr = select_by_bit(reg0, input.ap, input.fp) + off0;
+    let lhs_addr = select_by_bit(reg1, input.ap, input.fp) + off1;
+    let rhs_addr = select_by_bit(reg2, input.ap, input.fp) + off2;
 
     trace[11].data[row_index] = dst_addr;
     trace[12].data[row_index] = lhs_addr;
