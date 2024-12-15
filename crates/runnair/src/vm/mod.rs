@@ -25,13 +25,10 @@ use self::jmp::*;
 use self::jnz::*;
 use crate::memory::relocatable::{MaybeRelocatable, Relocatable, Segment};
 use crate::memory::{MaybeRelocatableAddr, Memory};
-use crate::utils::{
-    get_tests_data_dir, m31_from_hex_str, maybe_resize, qm31_from_hex_str_array, u32_from_usize,
-};
+use crate::utils::{get_tests_data_dir, m31_from_hex_str, maybe_resize, u32_from_usize};
 
 // TODO: reconsider input type and parsing.
 pub(crate) type Input = serde_json::Value;
-const IMMEDIATES_SEGMENT: Segment = 2;
 
 #[derive(Clone, Copy, Debug)]
 pub struct State {
@@ -89,14 +86,12 @@ impl<T: Into<M31>> From<[T; 4]> for Instruction {
 pub struct Program {
     pub instructions: Vec<Instruction>,
     pub hints: Hints,
-    pub immediates: Vec<QM31>,
 }
 
 #[derive(Debug, Deserialize)]
 struct ProgramRaw {
     data: Vec<[String; 4]>,
     hints: serde_json::Map<String, serde_json::Value>,
-    immediates: Vec<[String; 4]>,
 }
 
 impl TryFrom<ProgramRaw> for Program {
@@ -107,7 +102,7 @@ impl TryFrom<ProgramRaw> for Program {
             .data
             .into_iter()
             .map(|instruction| {
-                let raw_instruction = instruction.map(m31_from_hex_str);
+                let raw_instruction = instruction.map(|x| m31_from_hex_str(&x));
                 Instruction::from(raw_instruction)
             })
             .collect();
@@ -128,16 +123,9 @@ impl TryFrom<ProgramRaw> for Program {
             hints[pc] = Some(hint);
         }
 
-        let immediates: Vec<_> = raw_program
-            .immediates
-            .into_iter()
-            .map(qm31_from_hex_str_array)
-            .collect();
-
         Ok(Self {
             instructions,
             hints,
-            immediates,
         })
     }
 }
@@ -169,33 +157,34 @@ impl VM {
 }
 
 impl VM {
-    const FINAL_FP: (Segment, u32) = (4, 0);
-    const FINAL_PC: (Segment, u32) = (5, 0);
+    const FINAL_FP: (Segment, u32) = (3, 0);
+    const FINAL_PC: (Segment, u32) = (4, 0);
 
     pub fn create_for_main_entry_point(program: Program, input: Input) -> Self {
+        let program_segment = 0;
+        let execution_segment = 1;
+        let output_segment = 2;
+
         // Prepare memory.
 
         // Segment 0: program.
-        let program_segment = 0;
         let program_memory_segment =
             program
                 .instructions
                 .iter()
                 .enumerate()
                 .map(|(index, instruction)| {
-                    let instruction_address =
-                        Relocatable::from((program_segment, u32_from_usize(index)));
                     let args = instruction.args;
                     let encoded_instruction =
                         QM31::from_m31_array([instruction.op, args[0], args[1], args[2]]);
+                    let instruction_address =
+                        Relocatable::from((program_segment, u32_from_usize(index)));
 
                     (instruction_address, encoded_instruction)
                 });
         let mut memory = Memory::from_iter(program_memory_segment);
 
         // Segment 1: execution.
-        let execution_segment = 1;
-        let output_segment = 3;
         let execution_memory_segment = [
             // Pointer to output cell.
             ((execution_segment, 0), (output_segment, 0)),
@@ -206,19 +195,7 @@ impl VM {
         .map(|(address, value)| (Relocatable::from(address), Relocatable::from(value)));
         memory.extend(execution_memory_segment);
 
-        // Segment 2: immediates.
-        let immediates_memory_segment =
-            program
-                .immediates
-                .into_iter()
-                .enumerate()
-                .map(|(index, immediate)| {
-                    let immediate_address = immediates_segment_base() + index.into();
-                    (immediate_address, immediate)
-                });
-        memory.extend(immediates_memory_segment);
-
-        // Segments 4, 5: write final `fp`, `pc`.
+        // Segments 3, 4: write final `fp`, `pc`.
         let final_pointers = [
             (Self::FINAL_FP, QM31::zero()),
             (Self::FINAL_PC, QM31::zero()),
@@ -461,10 +438,6 @@ fn opcode_to_instruction(opcode: M31) -> InstructionFn {
     }
 }
 
-pub(crate) fn immediates_segment_base() -> Relocatable {
-    Relocatable::from((IMMEDIATES_SEGMENT, 0))
-}
-
 pub(crate) fn resolve_addresses<const N: usize>(
     state: State,
     bases: &[&str; N],
@@ -475,13 +448,11 @@ pub(crate) fn resolve_addresses<const N: usize>(
         "The number of bases and offsets should not exceed 3"
     );
 
-    let immediates_segment_base = immediates_segment_base().into();
     std::array::from_fn(|i| {
         let base = bases[i];
         let base_address = match base {
             "ap" => state.ap,
             "fp" => state.fp,
-            "imm" => immediates_segment_base,
             _ => panic!("Invalid base: {}", base),
         };
         base_address + offsets[i]
