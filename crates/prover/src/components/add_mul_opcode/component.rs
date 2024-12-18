@@ -68,7 +68,7 @@ impl FrameworkEval for Eval {
 
         // Check instruction.
         let [off0, off1, off2] = std::array::from_fn(|_| eval.next_trace_mask());
-        let opcode = decode_opcode::<E>(
+        let opcode = decode_opcode(
             INSTRUCTION_BASE.into(),
             &[
                 (op_type.clone(), 2), // [add, mul]

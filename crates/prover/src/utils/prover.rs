@@ -28,3 +28,25 @@ pub fn decode_opcode<const N: usize>(
     assert!(flags.is_zero(), "Too many flags.");
     res
 }
+
+#[cfg(test)]
+mod tests {
+    use num_traits::Zero;
+    use stwo_prover::core::backend::simd::m31::PackedM31;
+    use stwo_prover::core::fields::m31::M31;
+
+    use crate::utils::prover::decode_opcode;
+
+    #[test]
+    fn test_prover_decode() {
+        let base = M31(123);
+        let flags = [M31(1), M31(2), M31(3), M31(2)].map(PackedM31::broadcast);
+
+        let opcode = PackedM31::broadcast(base + M31(1 + (2 * 2) + (6 * 3) + (24 * 2)));
+
+        assert!(decode_opcode(base, opcode, [2, 3, 4, 3])
+            .into_iter()
+            .zip(flags)
+            .all(|(x, y)| (x - y).is_zero()));
+    }
+}

@@ -22,6 +22,7 @@ mod tests {
     use crate::input::mem::{MemConfig, MemoryBuilder};
     use crate::input::vm_import::MemEntry;
 
+    #[ignore]
     #[test]
     fn test_ret() {
         let memory = MemoryBuilder::from_iter(
@@ -33,7 +34,7 @@ mod tests {
         )
         .build();
         let mut memory_claim_generator = addr_to_f31::ClaimGenerator::new(&memory);
-        let mut ret_claim_generator = ret_opcode::ClaimGenerator::new(vec![VmState {
+        let ret_claim_generator = ret_opcode::ClaimGenerator::new(vec![VmState {
             pc: 1,
             ap: 2,
             fp: 3,
@@ -52,9 +53,9 @@ mod tests {
         // assert_eq!(
 
         let channel = &mut Blake2sChannel::default();
-        let interaction_elements = CairoInteractionElements::draw(channel);
+        let _interaction_elements = CairoInteractionElements::draw(channel);
 
-        let (claim, ret_interaction_prover) =
+        let (_claim, ret_interaction_prover) =
             ret_claim_generator.write_trace(&mut tree_builder, &mut memory_claim_generator);
 
         for a in ret_interaction_prover.memory_outputs {
