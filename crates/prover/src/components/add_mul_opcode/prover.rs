@@ -18,7 +18,7 @@ use crate::components::memory::addr_to_f31;
 use crate::input::instructions::VmState;
 use crate::relations::{MemoryRelation, StateRelation, N_MEMORY_ELEMS, STATE_SIZE};
 use crate::utils::prover::decode_opcode;
-use crate::utils::select_by_bit;
+use crate::utils::{Selector, SelectorTrait};
 
 const N_MEMORY_LOOKUPS: usize = 4;
 const N_STATE_LOOKUPS: usize = 2;
@@ -210,9 +210,10 @@ fn write_trace_row(
     ];
     interaction_claim_generator.memory[0].push([input.pc, opcode, off0, off1, off2]);
 
-    let [is_mul, reg0, reg1, reg2, appp] = decode_opcode(INSTRUCTION_BASE, opcode, [2, 2, 2, 2, 2]);
+    let [op_type, reg0, reg1, reg2, appp] =
+        decode_opcode(INSTRUCTION_BASE, opcode, [2, 2, 2, 2, 2]);
 
-    trace[3].data[row_index] = is_mul;
+    trace[3].data[row_index] = op_type;
     trace[4].data[row_index] = reg0;
     trace[5].data[row_index] = reg1;
     trace[6].data[row_index] = reg2;
@@ -224,9 +225,9 @@ fn write_trace_row(
     trace[10].data[row_index] = off2;
 
     // Addresses
-    let dst_addr = select_by_bit(reg0, input.ap, input.fp) + off0;
-    let lhs_addr = select_by_bit(reg1, input.ap, input.fp) + off1;
-    let rhs_addr = select_by_bit(reg2, input.ap, input.fp) + off2;
+    let dst_addr = Selector::select(&reg0, [&input.ap, &input.fp]) + off0;
+    let lhs_addr = Selector::select(&reg1, [&input.ap, &input.fp]) + off1;
+    let rhs_addr = Selector::select(&reg2, [&input.ap, &input.fp]) + off2;
 
     trace[11].data[row_index] = dst_addr;
     trace[12].data[row_index] = lhs_addr;

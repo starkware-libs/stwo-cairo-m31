@@ -12,7 +12,7 @@ use stwo_prover::core::pcs::TreeVec;
 
 use crate::relations::{MemoryRelation, StateRelation};
 use crate::utils::component::decode_opcode;
-use crate::utils::select_by_bit;
+use crate::utils::{Selector, SelectorTrait};
 
 pub const N_TRACE_COLUMNS: usize = 26;
 // TODO(alont): set instruction bases to not overlap
@@ -59,8 +59,8 @@ impl FrameworkEval for Eval {
         let [pc, ap, fp] = state;
 
         // Assert flags are in range.
-        let [is_mul, reg0, reg1, reg2, appp] = std::array::from_fn(|_| eval.next_trace_mask());
-        eval.add_constraint(is_mul.clone() * is_mul.clone() - is_mul.clone());
+        let [op_type, reg0, reg1, reg2, appp] = std::array::from_fn(|_| eval.next_trace_mask());
+        eval.add_constraint(op_type.clone() * op_type.clone() - op_type.clone());
         eval.add_constraint(reg0.clone() * reg0.clone() - reg0.clone());
         eval.add_constraint(reg1.clone() * reg1.clone() - reg1.clone());
         eval.add_constraint(reg2.clone() * reg2.clone() - reg2.clone());
@@ -71,11 +71,11 @@ impl FrameworkEval for Eval {
         let opcode = decode_opcode::<E>(
             INSTRUCTION_BASE.into(),
             &[
-                (is_mul.clone(), 2),
-                (reg0.clone(), 2),
-                (reg1.clone(), 2),
-                (reg2.clone(), 2),
-                (appp.clone(), 2),
+                (op_type.clone(), 2), // [add, mul]
+                (reg0.clone(), 2),    // [ap, fp]
+                (reg1.clone(), 2),    // [ap, fp]
+                (reg2.clone(), 2),    // [ap, fp]
+                (appp.clone(), 2),    // [false, true]
             ],
         );
 
@@ -96,16 +96,13 @@ impl FrameworkEval for Eval {
             std::array::from_fn(|_| eval.next_trace_mask());
 
         eval.add_constraint(
-            dst_address.clone()
-                - (select_by_bit(reg0.clone(), ap.clone(), fp.clone()) + off0.clone()),
+            dst_address.clone() - (Selector::select(&reg0, [&ap, &fp]) + off0.clone()),
         );
         eval.add_constraint(
-            dst_address.clone()
-                - (select_by_bit(reg1.clone(), ap.clone(), fp.clone()) + off1.clone()),
+            lhs_address.clone() - (Selector::select(&reg1, [&ap, &fp]) + off1.clone()),
         );
         eval.add_constraint(
-            dst_address.clone()
-                - (select_by_bit(reg2.clone(), ap.clone(), fp.clone()) + off2.clone()),
+            rhs_address.clone() - (Selector::select(&reg2, [&ap, &fp]) + off2.clone()),
         );
 
         // Read memory.
@@ -138,10 +135,12 @@ impl FrameworkEval for Eval {
         // Apply operation.
         eval.add_constraint(
             dst_val
-                - (select_by_bit(
-                    E::EF::from(is_mul),
-                    lhs_val.clone() + rhs_val.clone(),
-                    lhs_val.clone() * rhs_val.clone(),
+                - (Selector::select(
+                    &E::EF::from(op_type),
+                    [
+                        &(lhs_val.clone() + rhs_val.clone()),
+                        &(lhs_val.clone() * rhs_val.clone()),
+                    ],
                 )),
         );
 
