@@ -1,12 +1,13 @@
 use itertools::{chain, Itertools};
 use num_traits::One;
 use serde::{Deserialize, Serialize};
+use stwo_prover::constraint_framework::logup::LogupSums;
 use stwo_prover::constraint_framework::{
     EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
 };
+use stwo_prover::core::backend::simd::m31::LOG_N_LANES;
 use stwo_prover::core::channel::Channel;
 use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fields::qm31::SecureField;
 use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
 use stwo_prover::core::pcs::TreeVec;
 
@@ -22,30 +23,23 @@ pub type Component = FrameworkComponent<Eval>;
 
 #[derive(Clone)]
 pub struct Eval {
-    pub log_n_rows: u32,
+    pub claim: Claim,
     pub memory_lookup: MemoryRelation,
     pub state_lookup: StateRelation,
-    pub claimed_sum: SecureField,
 }
 impl Eval {
-    pub fn new(
-        ret_claim: Claim,
-        memory_lookup: MemoryRelation,
-        state_lookup: StateRelation,
-        interaction_claim: InteractionClaim,
-    ) -> Self {
+    pub fn new(claim: Claim, memory_lookup: MemoryRelation, state_lookup: StateRelation) -> Self {
         Self {
-            log_n_rows: ret_claim.n_calls.next_power_of_two().ilog2(),
+            claim: claim.clone(),
             memory_lookup,
             state_lookup,
-            claimed_sum: interaction_claim.claimed_sum,
         }
     }
 }
 
 impl FrameworkEval for Eval {
     fn log_size(&self) -> u32 {
-        self.log_n_rows
+        std::cmp::max(self.claim.n_calls.next_power_of_two().ilog2(), LOG_N_LANES)
     }
 
     fn max_constraint_log_degree_bound(&self) -> u32 {
@@ -182,10 +176,15 @@ impl Claim {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct InteractionClaim {
     pub log_size: u32,
-    pub claimed_sum: SecureField,
+    pub logup_sums: LogupSums,
 }
 impl InteractionClaim {
     pub fn mix_into(&self, channel: &mut impl Channel) {
-        channel.mix_felts(&[self.claimed_sum]);
+        let (total_sum, claimed_sum) = self.logup_sums;
+        channel.mix_felts(&[total_sum]);
+        if let Some(claimed_sum) = claimed_sum {
+            channel.mix_felts(&[claimed_sum.0]);
+            channel.mix_u64(claimed_sum.1 as u64);
+        }
     }
 }

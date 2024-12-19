@@ -1,5 +1,5 @@
 use itertools::{zip_eq, Itertools};
-use num_traits::{One, Zero};
+use num_traits::One;
 use stwo_prover::constraint_framework::logup::LogupTraceGenerator;
 use stwo_prover::constraint_framework::Relation;
 use stwo_prover::core::backend::simd::m31::{PackedM31, LOG_N_LANES, N_LANES};
@@ -67,7 +67,7 @@ impl ClaimGenerator {
             write_trace_simd(&self.inputs, memory_trace_generator);
         interaction_claim_generator.memory.iter().for_each(|c| {
             c.iter()
-                .for_each(|v| memory_trace_generator.add_inputs_simd(&v[0]))
+                .for_each(|v| memory_trace_generator.add_packedm31_inputs(v[0]))
         });
         tree_builder.extend_evals(trace);
         let claim = Claim {
@@ -78,12 +78,14 @@ impl ClaimGenerator {
 }
 
 pub struct InteractionClaimGenerator {
+    pub n_calls: usize,
     pub memory: [Vec<[PackedM31; N_MEMORY_ELEMS]>; N_MEMORY_LOOKUPS],
     pub state: [Vec<[PackedM31; STATE_SIZE]>; N_STATE_LOOKUPS],
 }
 impl InteractionClaimGenerator {
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
+            n_calls: capacity,
             memory: [
                 Vec::with_capacity(capacity),
                 Vec::with_capacity(capacity),
@@ -130,18 +132,26 @@ impl InteractionClaimGenerator {
         let state_yield = &self.state[1];
         for (i, (x, y)) in zip_eq(read_rhs, state_yield).enumerate() {
             let denom_x: PackedQM31 = memory_relation.combine(x);
-            let denom_y: PackedQM31 = memory_relation.combine(y);
+            let denom_y: PackedQM31 = state_relation.combine(y);
 
             col2.write_frac(i, denom_y - denom_x, denom_x * denom_y)
         }
         col2.finalize_col();
 
-        let (trace, claimed_sum) = logup_gen.finalize_last();
+        let (trace, total_sum, claimed_sum) = if self.n_calls == 1 << log_size {
+            let (trace, claimed_sum) = logup_gen.finalize_last();
+            (trace, claimed_sum, None)
+        } else {
+            let (trace, [total_sum, claimed_sum]) =
+                logup_gen.finalize_at([(1 << log_size) - 1, self.n_calls - 1]);
+            (trace, total_sum, Some((claimed_sum, self.n_calls - 1)))
+        };
+
         tree_builder.extend_evals(trace);
 
         InteractionClaim {
             log_size,
-            claimed_sum,
+            logup_sums: (total_sum, claimed_sum),
         }
     }
 }
@@ -230,24 +240,31 @@ fn write_trace_row(
     trace[13].data[row_index] = rhs_addr;
 
     // Values
-    let [dst0, dst1, dst2, dst3] = [
-        memory_trace_generator.deduce_output(dst_addr),
-        PackedM31::zero(),
-        PackedM31::zero(),
-        PackedM31::zero(),
-    ];
-    let [lhs0, lhs1, lhs2, lhs3] = [
-        memory_trace_generator.deduce_output(lhs_addr),
-        PackedM31::zero(),
-        PackedM31::zero(),
-        PackedM31::zero(),
-    ];
-    let [rhs0, rhs1, rhs2, rhs3] = [
-        memory_trace_generator.deduce_output(rhs_addr),
-        PackedM31::zero(),
-        PackedM31::zero(),
-        PackedM31::zero(),
-    ];
+    let [dst0, dst1, dst2, dst3] = memory_trace_generator
+        .deduce_output(dst_addr)
+        .into_packed_m31s();
+    let [lhs0, lhs1, lhs2, lhs3] = memory_trace_generator
+        .deduce_output(lhs_addr)
+        .into_packed_m31s();
+    let [rhs0, rhs1, rhs2, rhs3] = memory_trace_generator
+        .deduce_output(rhs_addr)
+        .into_packed_m31s();
+
+    trace[14].data[row_index] = dst0;
+    trace[15].data[row_index] = dst1;
+    trace[16].data[row_index] = dst2;
+    trace[17].data[row_index] = dst3;
+
+    trace[18].data[row_index] = lhs0;
+    trace[19].data[row_index] = lhs1;
+    trace[20].data[row_index] = lhs2;
+    trace[21].data[row_index] = lhs3;
+
+    trace[22].data[row_index] = rhs0;
+    trace[23].data[row_index] = rhs1;
+    trace[24].data[row_index] = rhs2;
+    trace[25].data[row_index] = rhs3;
+
     interaction_claim_generator.memory[1].push([dst_addr, dst0, dst1, dst2, dst3]);
     interaction_claim_generator.memory[2].push([lhs_addr, lhs0, lhs1, lhs2, lhs3]);
     interaction_claim_generator.memory[3].push([rhs_addr, rhs0, rhs1, rhs2, rhs3]);

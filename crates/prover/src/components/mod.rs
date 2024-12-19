@@ -11,13 +11,12 @@ mod tests {
     use num_traits::One;
     use stwo_prover::core::backend::simd::SimdBackend;
     use stwo_prover::core::channel::Blake2sChannel;
-    use stwo_prover::core::fields::m31::M31;
+    use stwo_prover::core::fields::qm31::QM31;
     use stwo_prover::core::pcs::{CommitmentSchemeProver, PcsConfig};
     use stwo_prover::core::poly::circle::{CanonicCoset, PolyOps};
 
     use crate::cairo_air::CairoInteractionElements;
-    use crate::components::memory::addr_to_f31;
-    use crate::components::ret_opcode;
+    use crate::components::{memory, ret_opcode};
     use crate::input::instructions::VmState;
     use crate::input::mem::{MemConfig, MemoryBuilder};
     use crate::input::vm_import::MemEntry;
@@ -33,7 +32,7 @@ mod tests {
             }),
         )
         .build();
-        let mut memory_claim_generator = addr_to_f31::ClaimGenerator::new(&memory);
+        let mut memory_claim_generator = memory::ClaimGenerator::new(&memory);
         let ret_claim_generator = ret_opcode::ClaimGenerator::new(vec![VmState {
             pc: 1,
             ap: 2,
@@ -60,7 +59,7 @@ mod tests {
 
         for a in ret_interaction_prover.memory_outputs {
             let b = a.into_iter().flat_map(|f| f.to_array()).collect_vec();
-            assert_eq!(b, vec![M31::one()]);
+            assert_eq!(b, vec![QM31::one()]);
         }
     }
 }
