@@ -2,19 +2,33 @@ pub mod add_ap;
 pub mod assert;
 pub mod call;
 pub mod deref;
+pub mod hints;
 pub mod jmp;
 pub mod jnz;
 pub mod operand;
+use std::fs::File;
+use std::io::BufReader;
+use std::path::PathBuf;
 
+use num_traits::Zero;
+use serde::Deserialize;
+use serde_json;
 use stwo_prover::core::fields::m31::M31;
+use stwo_prover::core::fields::qm31::QM31;
 
 use self::add_ap::*;
 use self::assert::*;
 use self::call::*;
 use self::deref::*;
+use self::hints::*;
 use self::jmp::*;
 use self::jnz::*;
+use crate::memory::relocatable::{MaybeRelocatable, Relocatable, Segment};
 use crate::memory::{MaybeRelocatableAddr, Memory};
+use crate::utils::{get_tests_data_dir, m31_from_hex_str, maybe_resize, u32_from_usize};
+
+// TODO: reconsider input type and parsing.
+pub(crate) type Input = serde_json::Value;
 
 #[derive(Clone, Copy, Debug)]
 pub struct State {
@@ -41,21 +55,213 @@ impl State {
     }
 }
 
-pub struct VM {
-    _memory: Memory,
-    _state: State,
-}
+pub(crate) type InstructionArgs = [M31; 3];
 
-pub type InstructionArgs = [M31; 3];
-
+#[derive(Clone, Copy, Debug)]
 pub struct Instruction {
-    _op: M31,
-    _args: InstructionArgs,
+    pub op: M31,
+    pub args: InstructionArgs,
 }
+
+impl From<QM31> for Instruction {
+    fn from(instruction: QM31) -> Self {
+        let [op, args @ ..] = instruction.to_m31_array();
+        Self { op, args }
+    }
+}
+
+impl<T: Into<M31>> From<[T; 4]> for Instruction {
+    fn from(instruction: [T; 4]) -> Self {
+        let [op, args @ ..] = instruction;
+        Self {
+            op: op.into(),
+            args: args.map(|x| x.into()),
+        }
+    }
+}
+
+// TODO: add hints.
+#[derive(Debug, Deserialize)]
+#[serde(try_from = "ProgramRaw")]
+pub struct Program {
+    pub instructions: Vec<Instruction>,
+    pub hints: Hints,
+}
+
+#[derive(Debug, Deserialize)]
+struct ProgramRaw {
+    data: Vec<[String; 4]>,
+    hints: serde_json::Map<String, serde_json::Value>,
+}
+
+impl TryFrom<ProgramRaw> for Program {
+    type Error = serde_json::Error;
+
+    fn try_from(raw_program: ProgramRaw) -> Result<Self, Self::Error> {
+        let instructions: Vec<_> = raw_program
+            .data
+            .into_iter()
+            .map(|instruction| {
+                let raw_instruction = instruction.map(|x| m31_from_hex_str(&x));
+                Instruction::from(raw_instruction)
+            })
+            .collect();
+
+        let pc_to_hint = raw_program
+            .hints
+            .into_iter()
+            .filter_map(|(pc, hints_at_pc)| {
+                let pc = usize::from_str_radix(&pc, 16).unwrap();
+                let code = hints_at_pc.as_array()?.first()?.get("code")?;
+                // TODO: reconsider this clone.
+                Some((pc, serde_json::from_value(code.clone()).ok()?))
+            });
+
+        let mut hints = Hints::new();
+        for (pc, hint) in pc_to_hint.into_iter() {
+            maybe_resize(&mut hints, pc, None);
+            hints[pc] = Some(hint);
+        }
+
+        Ok(Self {
+            instructions,
+            hints,
+        })
+    }
+}
+
+impl Program {
+    fn from_compiled_file(path: PathBuf) -> Self {
+        let file = File::open(path).unwrap();
+        let reader = BufReader::new(file);
+        let raw_program: ProgramRaw = serde_json::from_reader(reader).unwrap();
+        Program::try_from(raw_program).unwrap()
+    }
+}
+
+#[derive(Debug)]
+pub struct VM {
+    memory: Memory,
+    state: State,
+    hint_runner: HintRunner,
+}
+
+impl VM {
+    pub fn memory(&self) -> &Memory {
+        &self.memory
+    }
+
+    pub fn state(&self) -> &State {
+        &self.state
+    }
+}
+
+impl VM {
+    const FINAL_FP: (Segment, u32) = (3, 0);
+    const FINAL_PC: (Segment, u32) = (4, 0);
+
+    pub fn create_for_main_entry_point(program: Program, input: Input) -> Self {
+        let program_segment = 0;
+        let execution_segment = 1;
+        let output_segment = 2;
+
+        // Prepare memory.
+
+        // Segment 0: program.
+        let program_memory_segment =
+            program
+                .instructions
+                .iter()
+                .enumerate()
+                .map(|(index, instruction)| {
+                    let args = instruction.args;
+                    let encoded_instruction =
+                        QM31::from_m31_array([instruction.op, args[0], args[1], args[2]]);
+                    let instruction_address =
+                        Relocatable::from((program_segment, u32_from_usize(index)));
+
+                    (instruction_address, encoded_instruction)
+                });
+        let mut memory = Memory::from_iter(program_memory_segment);
+
+        // Segment 1: execution.
+        let execution_memory_segment = [
+            // Pointer to output cell.
+            ((execution_segment, 0), (output_segment, 0)),
+            // Final `fp`, `pc`; we never return from main.
+            ((execution_segment, 1), Self::FINAL_FP),
+            ((execution_segment, 2), Self::FINAL_PC),
+        ]
+        .map(|(address, value)| (Relocatable::from(address), Relocatable::from(value)));
+        memory.extend(execution_memory_segment);
+
+        // Segments 3, 4: write final `fp`, `pc`.
+        let final_pointers = [
+            (Self::FINAL_FP, QM31::zero()),
+            (Self::FINAL_PC, QM31::zero()),
+        ]
+        .map(|(address, value)| (Relocatable::from(address), value));
+        memory.extend(final_pointers);
+
+        // Prepare state.
+
+        let initial_stack = Relocatable::from((execution_segment, 3));
+        let pc = Relocatable::from((program_segment, 0));
+        let state = State {
+            ap: initial_stack.into(),
+            fp: initial_stack.into(),
+            pc: pc.into(),
+        };
+
+        // Prepare hint runner.
+        let hint_runner = HintRunner::new(program.hints, input);
+
+        Self {
+            memory,
+            state,
+            hint_runner,
+        }
+    }
+
+    fn step(&mut self) {
+        self.hint_runner
+            .maybe_execute_hint(&mut self.memory, &self.state);
+        self.execute_instruction();
+    }
+
+    fn execute_instruction(&mut self) {
+        let MaybeRelocatable::Absolute(instruction) = self.memory[self.state.pc] else {
+            panic!("Instruction must be an absolute value.");
+        };
+        let Instruction { op, args } = instruction.into();
+        let instruction_fn = opcode_to_instruction(op);
+
+        self.state = instruction_fn(&mut self.memory, self.state, args);
+    }
+
+    pub fn execute(&mut self) {
+        let [final_fp, final_pc] =
+            [Self::FINAL_FP, Self::FINAL_PC].map(|x| MaybeRelocatableAddr::Relocatable(x.into()));
+
+        while self.state.pc != final_pc {
+            self.step();
+        }
+
+        assert_eq!(
+            self.state.fp, final_fp,
+            "Only final `fp` is allowed when at final `pc`."
+        );
+    }
+}
+
+// Utils.
+
+type InstructionFn = fn(&mut Memory, State, InstructionArgs) -> State;
 
 // TODO(alont): autogenerate this.
-pub fn opcode_to_instruction(opcode: usize) -> fn(&mut Memory, State, InstructionArgs) -> State {
-    match opcode {
+// TODO: optimize order.
+fn opcode_to_instruction(opcode: M31) -> InstructionFn {
+    match opcode.0 {
         0 => addap_add_ap_ap,
         1 => addap_add_ap_fp,
         2 => addap_add_fp_ap,
@@ -232,8 +438,6 @@ pub fn opcode_to_instruction(opcode: usize) -> fn(&mut Memory, State, Instructio
     }
 }
 
-// Utils.
-
 pub(crate) fn resolve_addresses<const N: usize>(
     state: State,
     bases: &[&str; N],
@@ -253,4 +457,23 @@ pub(crate) fn resolve_addresses<const N: usize>(
         };
         base_address + offsets[i]
     })
+}
+
+pub(crate) fn run_fibonacci() {
+    let program_path = get_tests_data_dir().join("fibonacci_compiled.json");
+    let program = Program::from_compiled_file(program_path);
+    let input = serde_json::json!({ "fibonacci_claim_index": ["0x64", "0x0", "0x0", "0x0"]});
+    let mut vm = VM::create_for_main_entry_point(program, input);
+
+    vm.execute();
+}
+
+#[cfg(test)]
+mod test {
+    use crate::vm::run_fibonacci;
+
+    #[test]
+    fn test_runner() {
+        run_fibonacci()
+    }
 }

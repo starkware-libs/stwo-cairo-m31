@@ -64,7 +64,7 @@ macro_rules! define_jnz {
     ($cond:ident, $dest:ident) => {
         paste! {
             /// Jump-not-zero without incrementing `ap`: `jnz_[ap/fp]_[ap/fp]`.
-            pub fn [<jnz_ $cond _ $dest >] (
+            pub(crate) fn [<jnz_ $cond _ $dest >] (
                 memory: &mut Memory,
                 state: State,
                 args: InstructionArgs,
@@ -79,7 +79,7 @@ macro_rules! define_jnz {
             }
 
             /// Jump-not-zero with incrementing `ap`: `jnz_[ap/fp]_[ap/fp][_appp]`.
-            pub fn [<jnz_ $cond _ $dest _appp>] (
+            pub(crate) fn [<jnz_ $cond _ $dest _appp>] (
                 memory: &mut Memory,
                 state: State,
                 args: InstructionArgs,
@@ -100,7 +100,7 @@ macro_rules! define_jnz_imm {
     ($dest:ident) => {
         paste! {
             /// Jump-not-zero without incrementing `ap`: `jnz_imm_[ap/fp]`.
-            pub fn [<jnz_imm_ $dest >] (
+            pub(crate) fn [<jnz_imm_ $dest >] (
                 memory: &mut Memory,
                 state: State,
                 args: InstructionArgs,
@@ -115,7 +115,7 @@ macro_rules! define_jnz_imm {
             }
 
             /// Jump-not-zero with incrementing `ap`: `jnz_imm_[ap/fp]_appp`.
-            pub fn [<jnz_imm_ $dest _appp>] (
+            pub(crate) fn [<jnz_imm_ $dest _appp>] (
                 memory: &mut Memory,
                 state: State,
                 args: InstructionArgs,

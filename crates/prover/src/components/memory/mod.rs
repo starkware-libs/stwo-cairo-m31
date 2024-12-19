@@ -1,14 +1,18 @@
-pub mod addr_to_f31;
+pub mod component;
+pub mod prover;
 
 pub const LOG_MEMORY_ADDRESS_BOUND: u32 = 20;
 pub const MEMORY_ADDRESS_BOUND: usize = 1 << LOG_MEMORY_ADDRESS_BOUND;
+
+pub use component::{Claim, Component, Eval, InteractionClaim, MemoryRelation};
+pub use prover::ClaimGenerator;
 
 #[cfg(test)]
 mod tests {
     use itertools::Itertools;
     use stwo_prover::core::fields::m31::BaseField;
 
-    use crate::components::memory::addr_to_f31;
+    use crate::components::memory::prover::ClaimGenerator;
     use crate::input::mem::{MemConfig, MemoryBuilder};
     use crate::input::vm_import::MemEntry;
 
@@ -22,7 +26,7 @@ mod tests {
             }),
         )
         .build();
-        let mut claim_generator = addr_to_f31::ClaimGenerator::new(&memory);
+        let mut claim_generator = ClaimGenerator::new(&memory);
         let address_usages = [0, 1, 1, 2, 2, 2]
             .into_iter()
             .map(BaseField::from)
