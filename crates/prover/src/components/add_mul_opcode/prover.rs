@@ -14,7 +14,7 @@ use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleChannel;
 
 use super::component::{Claim, InteractionClaim, INSTRUCTION_BASE};
 use crate::components::add_mul_opcode::component::N_TRACE_COLUMNS;
-use crate::components::memory::addr_to_f31;
+use crate::components::memory;
 use crate::input::instructions::VmState;
 use crate::relations::{MemoryRelation, StateRelation, N_MEMORY_ELEMS, STATE_SIZE};
 use crate::utils::prover::decode_opcode;
@@ -61,7 +61,7 @@ impl ClaimGenerator {
     pub fn write_trace(
         &self,
         tree_builder: &mut TreeBuilder<'_, '_, SimdBackend, Blake2sMerkleChannel>,
-        memory_trace_generator: &mut addr_to_f31::ClaimGenerator,
+        memory_trace_generator: &mut memory::ClaimGenerator,
     ) -> (Claim, InteractionClaimGenerator) {
         let (trace, interaction_claim_generator) =
             write_trace_simd(&self.inputs, memory_trace_generator);
@@ -148,7 +148,7 @@ impl InteractionClaimGenerator {
 
 fn write_trace_simd(
     inputs: &[PackedVmState],
-    memory_trace_generator: &addr_to_f31::ClaimGenerator,
+    memory_trace_generator: &memory::ClaimGenerator,
 ) -> (
     Vec<CircleEvaluation<SimdBackend, M31, BitReversedOrder>>,
     InteractionClaimGenerator,
@@ -192,7 +192,7 @@ fn write_trace_row(
     input: &PackedVmState,
     row_index: usize,
     interaction_claim_generator: &mut InteractionClaimGenerator,
-    memory_trace_generator: &addr_to_f31::ClaimGenerator,
+    memory_trace_generator: &memory::ClaimGenerator,
 ) {
     // Initial state
     trace[0].data[row_index] = input.pc;
@@ -201,13 +201,9 @@ fn write_trace_row(
     interaction_claim_generator.state[0].push([input.pc, input.ap, input.fp]);
 
     // Flags
-    // TODO(alont) change to actual values once memory values are QM31.
-    let [opcode, off0, off1, off2] = [
-        memory_trace_generator.deduce_output(input.pc),
-        PackedM31::zero(),
-        PackedM31::zero(),
-        PackedM31::zero(),
-    ];
+    let [opcode, off0, off1, off2] = memory_trace_generator
+        .deduce_output(input.pc)
+        .into_packed_m31s();
     interaction_claim_generator.memory[0].push([input.pc, opcode, off0, off1, off2]);
 
     let [op_type, reg0, reg1, reg2, appp] =
