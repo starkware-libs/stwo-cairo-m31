@@ -1,0 +1,37 @@
+use std::ops::{Add, Mul};
+
+use num_traits::One;
+use stwo_prover::core::fields::m31::M31;
+
+/// Decodes an opcode to its base and flags. Returns the opcode.
+/// `flags` is a list of pairs `(flag, n_variants)`, where `flag` is the flag value and
+/// `n_variants` is the number of variants that the flag can have.
+pub fn decode_opcode<T>(opcode_base: T, flags: &[(T, u32)]) -> T
+where
+    T: Clone + One + Mul<Output = T> + Add<Output = T> + From<M31>,
+{
+    let mut opcode = opcode_base;
+    let mut flag_shift = M31::one();
+    for (flag, n_variants) in flags {
+        opcode = opcode + T::from(flag_shift) * flag.clone();
+        flag_shift *= M31(*n_variants);
+    }
+    opcode
+}
+
+#[cfg(test)]
+mod tests {
+    use stwo_prover::core::fields::m31::M31;
+
+    use crate::utils::component::decode_opcode;
+
+    #[test]
+    fn test_component_decode() {
+        let base = M31(123);
+        let flags = [(M31(1), 2), (M31(2), 3), (M31(3), 4), (M31(2), 3)];
+
+        let opcode = base + M31(1 + (2 * 2) + (6 * 3) + (24 * 2));
+
+        assert_eq!(decode_opcode(base, &flags), opcode);
+    }
+}

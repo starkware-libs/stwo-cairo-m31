@@ -15,9 +15,9 @@ use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleChannel;
 use super::component::{
     Claim, InteractionClaim, MULTIPLICITY_COLUMN_OFFSET, N_ADDR_AND_VALUE_COLUMNS, N_COLUMNS,
 };
-use crate::components::memory::component::MemoryRelation;
 use crate::components::memory::MEMORY_ADDRESS_BOUND;
 use crate::input::mem::{Memory, MemoryValue};
+use crate::relations::MemoryRelation;
 
 pub struct ClaimGenerator {
     pub values: Vec<PackedSecureField>,
@@ -57,6 +57,12 @@ impl ClaimGenerator {
 
     pub fn add_inputs(&mut self, memory_index: usize) {
         self.multiplicities[memory_index] += 1;
+    }
+
+    pub fn add_packedm31_inputs(&mut self, memory_indices: PackedM31) {
+        for idx in memory_indices.to_array() {
+            self.multiplicities[idx.0 as usize] += 1;
+        }
     }
 
     pub fn write_trace(
