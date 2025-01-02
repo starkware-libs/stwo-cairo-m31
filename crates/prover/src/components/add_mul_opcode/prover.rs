@@ -39,7 +39,7 @@ impl ClaimGenerator {
 
         // TODO(spapini): Split to multiple components.
         let size = inputs.len().next_power_of_two();
-        inputs.resize(size, inputs[0].clone());
+        inputs.resize(size, inputs[0]);
 
         let inputs = inputs
             .into_iter()
@@ -67,7 +67,7 @@ impl ClaimGenerator {
             write_trace_simd(&self.inputs, memory_trace_generator);
         interaction_claim_generator.memory.iter().for_each(|c| {
             c.iter()
-                .for_each(|v| memory_trace_generator.add_packedm31_inputs(v[0]))
+                .for_each(|v| memory_trace_generator.add_inputs_simd(&v[0]))
         });
         tree_builder.extend_evals(trace);
         let claim = Claim {
