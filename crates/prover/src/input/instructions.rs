@@ -177,7 +177,7 @@ impl Instructions {
                 opcode_ret: false,
                 opcode_assert_eq: false,
             } if op1_base_fp != op1_base_ap => {
-                let index = op1_base_fp as usize | (ap_update_add_1 as usize) << 1;
+                let index = op1_base_fp as usize | ((ap_update_add_1 as usize) << 1);
                 self.jmp_abs[index].push(state);
             }
             // call rel imm.
@@ -252,8 +252,8 @@ impl Instructions {
                 let dst = mem.get(dst_addr.checked_add_signed(offset0 as i32).unwrap());
                 let taken = dst != MemoryValue(0.into());
                 let index = (dst_base_fp as usize)
-                    | (taken as usize) << 1
-                    | (ap_update_add_1 as usize) << 2;
+                    | ((taken as usize) << 1)
+                    | ((ap_update_add_1 as usize) << 2);
                 self.jnz_imm[index].push(state);
             }
             // [ap/fp + offset0] = [ap/fp + offset2].
