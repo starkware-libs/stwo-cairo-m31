@@ -10,6 +10,7 @@ use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::pcs::TreeBuilder;
 use stwo_prover::core::poly::circle::{CanonicCoset, CircleEvaluation};
 use stwo_prover::core::poly::BitReversedOrder;
+use stwo_prover::core::utils::bit_reverse_coset_to_circle_domain_order;
 use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleChannel;
 
 use super::component::{Claim, InteractionClaim, RET_INSTRUCTION};
@@ -21,12 +22,14 @@ use crate::relations::MemoryRelation;
 const N_MEMORY_CALLS: usize = 3;
 
 // TODO(Ohad): take from prover_types and remove.
+#[derive(Debug)]
 pub struct PackedCasmState {
     pub pc: PackedM31,
     pub ap: PackedM31,
     pub fp: PackedM31,
 }
 
+#[derive(Debug)]
 pub struct ClaimGenerator {
     pub inputs: Vec<PackedCasmState>,
 }
@@ -35,8 +38,16 @@ impl ClaimGenerator {
         assert!(!inputs.is_empty());
 
         // TODO(spapini): Split to multiple components.
-        let size = inputs.len().next_power_of_two();
-        inputs.resize(size, inputs[0].clone());
+        let n_calls = inputs.len();
+        assert_ne!(n_calls, 0);
+        let size = std::cmp::max(n_calls.next_power_of_two(), N_LANES);
+        inputs.resize(size, inputs[0]);
+        let need_padding = n_calls != size;
+
+        if need_padding {
+            inputs.resize(size, *inputs.first().unwrap());
+            bit_reverse_coset_to_circle_domain_order(&mut inputs);
+        }
 
         let inputs = inputs
             .into_iter()
@@ -53,8 +64,10 @@ impl ClaimGenerator {
                 })),
             })
             .collect_vec();
+
         Self { inputs }
     }
+
     pub fn write_trace(
         &self,
         tree_builder: &mut TreeBuilder<'_, '_, SimdBackend, Blake2sMerkleChannel>,
@@ -63,7 +76,7 @@ impl ClaimGenerator {
         let (trace, interaction_prover) = write_trace_simd(&self.inputs, memory_trace_generator);
         interaction_prover.memory_inputs.iter().for_each(|c| {
             c.iter()
-                .for_each(|v| memory_trace_generator.add_packedm31_inputs(*v))
+                .for_each(|v| memory_trace_generator.add_inputs_simd(v))
         });
         tree_builder.extend_evals(trace);
         let claim = Claim {
@@ -152,7 +165,6 @@ fn write_trace_simd(
         );
     });
 
-    dbg!(&trace_values);
     let trace = trace_values
         .into_iter()
         .map(|eval| {
