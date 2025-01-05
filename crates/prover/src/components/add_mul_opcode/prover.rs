@@ -71,21 +71,21 @@ impl ClaimGenerator {
         });
         tree_builder.extend_evals(trace);
         let claim = Claim {
-            n_calls: self.inputs.len() * N_LANES,
+            n_rows: self.inputs.len() * N_LANES,
         };
         (claim, interaction_claim_generator)
     }
 }
 
 pub struct InteractionClaimGenerator {
-    pub n_calls: usize,
+    pub n_rows: usize,
     pub memory: [Vec<[PackedM31; N_MEMORY_ELEMS]>; N_MEMORY_LOOKUPS],
     pub state: [Vec<[PackedM31; STATE_SIZE]>; N_STATE_LOOKUPS],
 }
 impl InteractionClaimGenerator {
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            n_calls: capacity,
+            n_rows: capacity,
             memory: [
                 Vec::with_capacity(capacity),
                 Vec::with_capacity(capacity),
@@ -138,13 +138,13 @@ impl InteractionClaimGenerator {
         }
         col2.finalize_col();
 
-        let (trace, total_sum, claimed_sum) = if self.n_calls == 1 << log_size {
+        let (trace, total_sum, claimed_sum) = if self.n_rows == 1 << log_size {
             let (trace, claimed_sum) = logup_gen.finalize_last();
             (trace, claimed_sum, None)
         } else {
             let (trace, [total_sum, claimed_sum]) =
-                logup_gen.finalize_at([(1 << log_size) - 1, self.n_calls - 1]);
-            (trace, total_sum, Some((claimed_sum, self.n_calls - 1)))
+                logup_gen.finalize_at([(1 << log_size) - 1, self.n_rows - 1]);
+            (trace, total_sum, Some((claimed_sum, self.n_rows - 1)))
         };
 
         tree_builder.extend_evals(trace);
