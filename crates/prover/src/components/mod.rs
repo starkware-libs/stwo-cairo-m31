@@ -7,6 +7,7 @@ pub const LOOKUP_INTERACTION_PHASE: usize = 1;
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
     use pretty_assertions::assert_eq;
     use stwo_prover::core::backend::simd::SimdBackend;
     use stwo_prover::core::fields::m31::BaseField;
@@ -62,8 +63,11 @@ mod tests {
             ret_claim_generator.write_trace(&mut tree_builder, &mut memory_claim_generator);
 
         let output = ret_interaction_prover
+            .lookup_data
             .memory_outputs
-            .map(|output| output[0].to_array()[0].to_m31_array()[0]);
+            .into_iter()
+            .map(|output| output.map(|x| x.to_array()[0].to_m31_array()[0]))
+            .collect_vec()[0];
         assert_eq!(output, *expected_output);
     }
 }
