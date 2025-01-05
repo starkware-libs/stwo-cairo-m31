@@ -7,9 +7,9 @@ use stwo_prover::core::fields::qm31::{SecureField, QM31};
 use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
 use stwo_prover::core::pcs::TreeVec;
 
-use crate::relations::{MemoryRelation, MEMORY_ID_SIZE, VALUE_SIZE};
+use crate::relations::{MemoryRelation, ADDR_SIZE, VALUE_SIZE};
 
-pub const N_ADDR_AND_VALUE_COLUMNS: usize = MEMORY_ID_SIZE + VALUE_SIZE;
+pub const N_ADDR_AND_VALUE_COLUMNS: usize = ADDR_SIZE + VALUE_SIZE;
 pub const MULTIPLICITY_COLUMN_OFFSET: usize = N_ADDR_AND_VALUE_COLUMNS;
 pub const N_MULTIPLICITY_COLUMNS: usize = 1;
 // TODO(AlonH): Make memory size configurable.
@@ -51,14 +51,14 @@ impl FrameworkEval for Eval {
     }
 
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
-        let id_and_value: [E::F; N_ADDR_AND_VALUE_COLUMNS] =
+        let addr_and_value: [E::F; N_ADDR_AND_VALUE_COLUMNS] =
             std::array::from_fn(|_| eval.next_trace_mask());
         let multiplicity = eval.next_trace_mask();
 
         eval.add_to_relation(RelationEntry::new(
             &self.lookup_elements,
             -E::EF::from(multiplicity),
-            &id_and_value,
+            &addr_and_value,
         ));
 
         eval.finalize_logup();
