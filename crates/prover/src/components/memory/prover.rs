@@ -19,6 +19,7 @@ use crate::components::memory::MEMORY_ADDRESS_BOUND;
 use crate::input::mem::{Memory, MemoryValue};
 use crate::relations::MemoryRelation;
 
+#[derive(Debug)]
 pub struct ClaimGenerator {
     pub values: Vec<PackedSecureField>,
     pub multiplicities: Vec<u32>,
@@ -49,7 +50,7 @@ impl ClaimGenerator {
     }
 
     pub fn deduce_output(&self, input: PackedM31) -> PackedSecureField {
-        let indices = input.to_array().map(|i| i.0 as usize);
+        let indices = input.to_array().map(|i| usize::try_from(i.0).unwrap());
         PackedSecureField::from_array(
             indices.map(|i| self.values[i / N_LANES].to_array()[i % N_LANES]),
         )
@@ -59,9 +60,10 @@ impl ClaimGenerator {
         self.multiplicities[memory_index] += 1;
     }
 
-    pub fn add_packedm31_inputs(&mut self, memory_indices: PackedM31) {
-        for idx in memory_indices.to_array() {
-            self.multiplicities[idx.0 as usize] += 1;
+    pub fn add_inputs_simd(&mut self, inputs: &PackedM31) {
+        let memory_ids = inputs.to_array();
+        for memory_id in memory_ids {
+            self.add_inputs(usize::try_from(memory_id.0).unwrap());
         }
     }
 
