@@ -1,6 +1,7 @@
 use std::ops::{Add, Mul};
 
 use num_traits::One;
+use stwo_prover::core::backend::simd::m31::LOG_N_LANES;
 use stwo_prover::core::fields::m31::M31;
 
 /// Decodes an opcode to its base and flags. Returns the opcode.
@@ -17,6 +18,10 @@ where
         flag_shift *= M31(*n_variants);
     }
     opcode
+}
+
+pub fn log_size(num: usize) -> u32 {
+    std::cmp::max(num.next_power_of_two().ilog2(), LOG_N_LANES)
 }
 
 #[cfg(test)]
