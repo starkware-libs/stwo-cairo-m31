@@ -1,7 +1,10 @@
+pub mod preprocessed;
+
 use itertools::{chain, Itertools};
 use num_traits::Zero;
+use preprocessed::preprocessed_trace_columns;
 use serde::{Deserialize, Serialize};
-use stwo_prover::constraint_framework::preprocessed_columns::gen_is_first;
+use stwo_prover::constraint_framework::preprocessed_columns::PreprocessedColumn;
 use stwo_prover::constraint_framework::{Relation, TraceLocationAllocator};
 use stwo_prover::core::air::{Component, ComponentProver};
 use stwo_prover::core::backend::simd::SimdBackend;
@@ -256,16 +259,10 @@ pub fn prove_cairo(input: CairoInput) -> Result<CairoProof<Blake2sMerkleHasher>,
 
     // Fixed trace.
     let mut tree_builder = commitment_scheme.tree_builder();
-    let addr_to_value_constant_trace =
-        gen_is_first::<SimdBackend>(claim.addr_to_value.log_sizes()[2][0]);
-    let range_check9_9_constant_trace = gen_is_first::<SimdBackend>(18);
     tree_builder.extend_evals(
-        [
-            vec![addr_to_value_constant_trace],
-            vec![range_check9_9_constant_trace],
-        ]
-        .into_iter()
-        .flatten(),
+        preprocessed_trace_columns()
+            .iter()
+            .map(PreprocessedColumn::gen_preprocessed_column::<SimdBackend>),
     );
     tree_builder.commit(channel);
 
