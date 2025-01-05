@@ -12,9 +12,6 @@ use stwo_prover::core::pcs::TreeVec;
 use crate::relations::MemoryRelation;
 
 pub const RET_N_TRACE_CELLS: usize = 5;
-// pub const RET_INSTRUCTION: [u32; N_M31_IN_FELT252] = [
-//     510, 447, 511, 495, 511, 91, 130, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-// 0, ];
 pub const RET_INSTRUCTION: M31 = M31::from_u32_unchecked(171);
 pub type Component = FrameworkComponent<Eval>;
 
@@ -31,7 +28,7 @@ impl Eval {
         interaction_claim: InteractionClaim,
     ) -> Self {
         Self {
-            log_n_rows: ret_claim.n_rets.next_power_of_two().ilog2(),
+            log_n_rows: ret_claim.n_rows.next_power_of_two().ilog2(),
             memory_lookup,
             claimed_sum: interaction_claim.claimed_sum,
         }
@@ -86,15 +83,15 @@ impl FrameworkEval for Eval {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Claim {
-    pub n_rets: usize,
+    pub n_rows: usize,
 }
 impl Claim {
     pub fn mix_into(&self, channel: &mut impl Channel) {
-        channel.mix_u64(self.n_rets as u64);
+        channel.mix_u64(self.n_rows as u64);
     }
 
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
-        let log_size = self.n_rets.next_power_of_two().ilog2();
+        let log_size = self.n_rows.next_power_of_two().ilog2();
         let interaction_0_log_sizes = vec![log_size; RET_N_TRACE_CELLS];
         let interaction_1_log_sizes = vec![log_size; SECURE_EXTENSION_DEGREE * 3];
         let fixed_log_sizes = vec![log_size];
