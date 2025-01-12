@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use stwo_prover::constraint_framework::{
     EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
 };
+use stwo_prover::core::backend::simd::m31::LOG_N_LANES;
 use stwo_prover::core::channel::Channel;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::SecureField;
@@ -91,7 +92,7 @@ impl Claim {
     }
 
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
-        let log_size = self.n_rows.next_power_of_two().ilog2();
+        let log_size = std::cmp::max(self.n_rows.next_power_of_two().ilog2(), LOG_N_LANES);
         let interaction_0_log_sizes = vec![log_size; RET_N_TRACE_CELLS];
         let interaction_1_log_sizes = vec![log_size; SECURE_EXTENSION_DEGREE * 3];
         let fixed_log_sizes = vec![log_size];
