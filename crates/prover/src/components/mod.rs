@@ -17,9 +17,9 @@ mod tests {
 
     use crate::components::ret_opcode::component::RET_INSTRUCTION;
     use crate::components::{memory, ret_opcode};
-    use crate::input::instructions::VmState;
     use crate::input::mem::{MemConfig, MemoryBuilder};
     use crate::input::vm_import::MemEntry;
+    use crate::utils::types::CasmState;
 
     #[test]
     fn test_ret_generator() {
@@ -35,7 +35,7 @@ mod tests {
         .build();
         let mut memory_claim_generator = memory::ClaimGenerator::new(&memory);
 
-        let input = VmState {
+        let input = CasmState {
             pc: 10, // arbitrary
             ap: 15, // arbitrary
             fp: 3,

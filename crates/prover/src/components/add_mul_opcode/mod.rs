@@ -27,8 +27,8 @@ mod tests {
     use super::*;
     use crate::components::add_mul_opcode::component::INSTRUCTION_BASE;
     use crate::components::memory;
-    use crate::input::instructions::VmState;
     use crate::relations;
+    use crate::utils::types::CasmState;
 
     #[test]
     fn test_add_mul_opcode() {
@@ -79,7 +79,7 @@ mod tests {
         let claim_generator = ClaimGenerator::new(
             chain!(
                 vec![
-                    VmState {
+                    CasmState {
                         pc: 0,
                         ap: 2,
                         fp: 4,
@@ -87,7 +87,7 @@ mod tests {
                     128
                 ],
                 vec![
-                    VmState {
+                    CasmState {
                         pc: 1,
                         ap: 2,
                         fp: 4,
