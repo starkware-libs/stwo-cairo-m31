@@ -17,11 +17,11 @@ use crate::utils::{Selector, SelectorTrait};
 pub const N_TRACE_CELLS: usize = 7;
 
 // Assumes INSTRUCTION_BASE=K such that:
-// ```
-// addap_imm = K
-// jmp_abs_imm = K + 1
-// jmp_rel_imm = K + 2
-/// ```
+/// `
+/// addap_imm = K
+/// jmp_abs_imm = K + 1
+/// jmp_rel_imm = K + 2
+/// `
 // TODO: organize opcodes so that K will work as detailed above, instead of just 0.
 pub const INSTRUCTION_BASE: M31 = M31::from_u32_unchecked(0);
 
