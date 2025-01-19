@@ -15,26 +15,19 @@ use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleChannel;
 use super::component::{Claim, InteractionClaim, INSTRUCTION_BASE};
 use crate::components::add_mul_opcode::component::N_TRACE_COLUMNS;
 use crate::components::memory;
-use crate::input::instructions::VmState;
 use crate::relations::{MemoryRelation, StateRelation, N_MEMORY_ELEMS, STATE_SIZE};
 use crate::utils::prover::decode_opcode;
+use crate::utils::types::{CasmState, PackedCasmState};
 use crate::utils::{Selector, SelectorTrait};
 
 const N_MEMORY_LOOKUPS: usize = 4;
 const N_STATE_LOOKUPS: usize = 2;
 
-// TODO(Ohad): take from prover_types and remove.
-pub struct PackedVmState {
-    pub pc: PackedM31,
-    pub ap: PackedM31,
-    pub fp: PackedM31,
-}
-
 pub struct ClaimGenerator {
-    pub inputs: Vec<PackedVmState>,
+    pub inputs: Vec<PackedCasmState>,
 }
 impl ClaimGenerator {
-    pub fn new(mut inputs: Vec<VmState>) -> Self {
+    pub fn new(mut inputs: Vec<CasmState>) -> Self {
         assert!(!inputs.is_empty());
 
         // TODO(spapini): Split to multiple components.
@@ -44,7 +37,7 @@ impl ClaimGenerator {
         let inputs = inputs
             .into_iter()
             .array_chunks::<N_LANES>()
-            .map(|chunk| PackedVmState {
+            .map(|chunk| PackedCasmState {
                 pc: PackedM31::from_array(std::array::from_fn(|i| {
                     M31::from_u32_unchecked(chunk[i].pc)
                 })),
@@ -157,7 +150,7 @@ impl InteractionClaimGenerator {
 }
 
 fn write_trace_simd(
-    inputs: &[PackedVmState],
+    inputs: &[PackedCasmState],
     memory_trace_generator: &memory::ClaimGenerator,
 ) -> (
     Vec<CircleEvaluation<SimdBackend, M31, BitReversedOrder>>,
@@ -199,7 +192,7 @@ fn write_trace_simd(
 // | State (3) | flags (5) | offsets (3) | addrs (3) | values (3 * 4) |
 fn write_trace_row(
     trace: &mut [Col<SimdBackend, M31>],
-    input: &PackedVmState,
+    input: &PackedCasmState,
     row_index: usize,
     interaction_claim_generator: &mut InteractionClaimGenerator,
     memory_trace_generator: &memory::ClaimGenerator,

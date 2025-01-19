@@ -15,28 +15,19 @@ use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleChannel;
 
 use super::component::{Claim, InteractionClaim, RET_INSTRUCTION};
 use crate::components::memory;
-use crate::input::instructions::VmState;
 use crate::relations::{MemoryRelation, StateRelation, N_MEMORY_ELEMS, STATE_SIZE};
+use crate::utils::types::{CasmState, PackedCasmState};
 
 const N_TRACE_COLUMNS: usize = 5;
-
 const N_MEMORY_LOOKUPS: usize = 3;
 const N_STATE_LOOKUPS: usize = 2;
-
-// TODO(Ohad): take from prover_types and remove.
-#[derive(Debug, Clone)]
-pub struct PackedCasmState {
-    pub pc: PackedM31,
-    pub ap: PackedM31,
-    pub fp: PackedM31,
-}
 
 #[derive(Debug)]
 pub struct ClaimGenerator {
     pub inputs: Vec<PackedCasmState>,
 }
 impl ClaimGenerator {
-    pub fn new(mut inputs: Vec<VmState>) -> Self {
+    pub fn new(mut inputs: Vec<CasmState>) -> Self {
         assert!(!inputs.is_empty());
 
         // TODO(spapini): Split to multiple components.

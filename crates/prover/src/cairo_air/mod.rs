@@ -21,9 +21,9 @@ use tracing::{span, Level};
 
 use crate::components::memory::component::{Claim, InteractionClaim};
 use crate::components::memory::{ClaimGenerator, Component as MemoryComponent, Eval};
-use crate::input::instructions::VmState;
 use crate::input::CairoInput;
 use crate::relations::MemoryRelation;
+use crate::utils::types::CasmState;
 
 #[derive(Serialize, Deserialize)]
 pub struct CairoProof<H: MerkleHasher> {
@@ -36,8 +36,8 @@ pub struct CairoProof<H: MerkleHasher> {
 pub struct CairoClaim {
     // Common claim values.
     pub public_memory: Vec<(M31, QM31)>,
-    pub initial_state: VmState,
-    pub final_state: VmState,
+    pub initial_state: CasmState,
+    pub final_state: CasmState,
 
     pub addr_to_value: Claim,
     // pub ret: Vec<ret_opcode::Claim>,
