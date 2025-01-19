@@ -1,5 +1,5 @@
 use itertools::{zip_eq, Itertools};
-use num_traits::{One, Zero};
+use num_traits::One;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use stwo_air_utils::trace::component_trace::ComponentTrace;
 use stwo_air_utils_derive::{IterMut, ParIterMut, Uninitialized};
@@ -13,15 +13,16 @@ use stwo_prover::core::pcs::TreeBuilder;
 use stwo_prover::core::utils::bit_reverse_coset_to_circle_domain_order;
 use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleChannel;
 
-use super::component::{Claim, InteractionClaim, RET_INSTRUCTION};
+use super::component::{Claim, InteractionClaim};
+use crate::components::addap_jmpabs_jmprel_opcode::component::INSTRUCTION_BASE;
 use crate::components::memory;
-use crate::input::instructions::VmState;
 use crate::relations::{MemoryRelation, StateRelation, N_MEMORY_ELEMS, STATE_SIZE};
-use crate::utils::types::PackedCasmState;
+use crate::utils::prover::decode_opcode;
+use crate::utils::types::{CasmState, PackedCasmState};
+use crate::utils::{Selector, SelectorTrait};
 
-const N_TRACE_COLUMNS: usize = 5;
-
-const N_MEMORY_LOOKUPS: usize = 3;
+const N_TRACE_COLUMNS: usize = 7;
+const N_MEMORY_LOOKUPS: usize = 1;
 const N_STATE_LOOKUPS: usize = 2;
 
 #[derive(Debug)]
@@ -29,42 +30,27 @@ pub struct ClaimGenerator {
     pub inputs: Vec<PackedCasmState>,
 }
 impl ClaimGenerator {
-    pub fn new(mut inputs: Vec<VmState>) -> Self {
+    pub fn new(mut inputs: Vec<CasmState>) -> Self {
         assert!(!inputs.is_empty());
 
         // TODO(spapini): Split to multiple components.
-        let n_rows = inputs.len();
-        assert_ne!(n_rows, 0);
-        let size = std::cmp::max(n_rows.next_power_of_two(), N_LANES);
-        inputs.resize(size, inputs[0]);
-        let need_padding = n_rows != size;
-
-        if need_padding {
-            inputs.resize(size, *inputs.first().unwrap());
-            bit_reverse_coset_to_circle_domain_order(&mut inputs);
-        }
+        let size = inputs.len().next_power_of_two();
+        inputs.resize(size, inputs[0].clone());
 
         let inputs = inputs
             .into_iter()
             .array_chunks::<N_LANES>()
             .map(|chunk| PackedCasmState {
-                pc: PackedM31::from_array(std::array::from_fn(|i| {
-                    M31::from_u32_unchecked(chunk[i].pc)
-                })),
-                ap: PackedM31::from_array(std::array::from_fn(|i| {
-                    M31::from_u32_unchecked(chunk[i].ap)
-                })),
-                fp: PackedM31::from_array(std::array::from_fn(|i| {
-                    M31::from_u32_unchecked(chunk[i].fp)
-                })),
+                pc: PackedM31::from_array(std::array::from_fn(|i| chunk[i].pc)),
+                ap: PackedM31::from_array(std::array::from_fn(|i| chunk[i].ap)),
+                fp: PackedM31::from_array(std::array::from_fn(|i| chunk[i].fp)),
             })
             .collect_vec();
-
         Self { inputs }
     }
 
     pub fn write_trace(
-        self,
+        mut self,
         tree_builder: &mut TreeBuilder<'_, '_, SimdBackend, Blake2sMerkleChannel>,
         memory_trace_generator: &mut memory::ClaimGenerator,
     ) -> (Claim, InteractionClaimGenerator) {
@@ -72,7 +58,14 @@ impl ClaimGenerator {
 
         let n_rows = self.inputs.len();
         assert_ne!(n_rows, 0);
+        let size = std::cmp::max(n_rows.next_power_of_two(), N_LANES);
+        let need_padding = n_rows != size;
 
+        if need_padding {
+            self.inputs
+                .resize(size, self.inputs.first().unwrap().clone());
+            bit_reverse_coset_to_circle_domain_order(&mut self.inputs);
+        }
         lookup_data.memory.iter().for_each(|c| {
             c.iter()
                 .for_each(|v| memory_trace_generator.add_inputs_simd(&v[0]))
@@ -138,8 +131,8 @@ impl InteractionClaimGenerator {
     }
 }
 
-// Ret trace row:
-// | pc | ap | fp | [fp-1] | [fp-2] |
+// add_ap_ trace row:
+// pc | ap | fp | trit (addap, jmp_abs, jmp_rel) | imm | res_pc | res_ap
 fn write_trace_simd(
     inputs: &[PackedCasmState],
     memory_trace_generator: &memory::ClaimGenerator,
@@ -157,38 +150,37 @@ fn write_trace_simd(
         .par_iter_mut()
         .zip(inputs.par_iter())
         .zip(lookup_data.par_iter_mut())
-        .for_each(|((row, ret_opcode_input), lookup_data)| {
-            let col0_pc = ret_opcode_input.pc;
-            *row[0] = col0_pc;
-            // Not added to memory inputs: `ap` not part of constraint yet.
-            let col1_ap = ret_opcode_input.ap;
-            *row[1] = col1_ap;
-            let col2_fp = ret_opcode_input.fp;
-            *row[2] = col2_fp;
-            let mem_fp_minus_one = memory_trace_generator
-                .deduce_output((col2_fp) - (PackedM31::broadcast(M31::one())));
+        .for_each(|((row, opcode_input), lookup_data)| {
+            // Initial state.
+            let pc = opcode_input.pc;
+            let ap = opcode_input.ap;
+            let fp = opcode_input.fp;
+            *row[0] = pc;
+            *row[1] = ap;
+            *row[2] = fp;
+            *lookup_data.state[0] = [pc, ap, fp];
 
-            *lookup_data.state[0] = [col0_pc, col1_ap, col2_fp];
+            // Decode insturction.
+            let [opcode, imm, off0, off1] =
+                memory_trace_generator.deduce_output(pc).into_packed_m31s();
+            *lookup_data.memory[0] = [pc, opcode, imm, off0, off1];
 
-            let col3 = mem_fp_minus_one;
-            *row[3] = col3.into_packed_m31s()[0];
-            let mem_fp_minus_two = memory_trace_generator
-                .deduce_output((col2_fp) - (PackedM31::broadcast(M31::from(2))));
+            let [op_type] = decode_opcode(INSTRUCTION_BASE, opcode, [3]);
 
-            *lookup_data.memory[0] = std::array::from_fn(|i| match i {
-                0 => col0_pc,
-                1 => PackedM31::broadcast(RET_INSTRUCTION),
-                _ => PackedM31::zero(),
-            });
+            *row[3] = op_type;
+            *row[4] = imm;
 
-            let [v0, v1, v2, v3] = mem_fp_minus_one.into_packed_m31s();
-            *lookup_data.memory[1] = [col2_fp - PackedM31::broadcast(M31::one()), v0, v1, v2, v3];
+            // Calc new state.
+            let new_pc = Selector::select(
+                &op_type,
+                [&(pc + PackedM31::broadcast(M31::one())), &imm, &(pc + imm)],
+            );
+            let new_ap = Selector::select(&op_type, [&(ap + imm), &ap, &ap]);
 
-            let [v0, v1, v2, v3] = mem_fp_minus_two.into_packed_m31s();
-            *lookup_data.memory[2] = [col2_fp - PackedM31::broadcast(M31::from(2)), v0, v1, v2, v3];
+            *row[5] = new_pc;
+            *row[6] = new_ap;
 
-            let col4 = mem_fp_minus_two;
-            *row[4] = col4.into_packed_m31s()[0];
+            *lookup_data.state[1] = [new_pc, new_ap, fp];
         });
 
     (trace, lookup_data)
