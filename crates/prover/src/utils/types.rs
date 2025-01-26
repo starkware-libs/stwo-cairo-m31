@@ -1,4 +1,5 @@
-use stwo_prover::core::{backend::simd::m31::PackedM31, fields::m31::M31};
+use stwo_prover::core::backend::simd::m31::PackedM31;
+use stwo_prover::core::fields::m31::M31;
 
 // TODO(Ohad): take from prover_types and remove.
 #[derive(Debug, Clone)]
