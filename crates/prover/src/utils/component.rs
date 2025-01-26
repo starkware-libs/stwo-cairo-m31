@@ -20,7 +20,14 @@ where
     opcode
 }
 
-/// Assert that `flag` is a trit (a digit in {0,1,2}).
+/// Create a constraint asserting that `flag` is a bit.
+pub fn is_bit<E: EvalAtRow>(flag: &E::F) -> E::F {
+    let f = || flag.clone();
+    // f^2 - f
+    f() * f() - f()
+}
+
+/// Create a constraint asserting that `flag` is a trit (a digit in {0,1,2}).
 pub fn is_trit<E: EvalAtRow>(flag: &E::F) -> E::F {
     let two = E::F::from(BaseField::from_u32_unchecked(2));
     let three = E::F::from(BaseField::from_u32_unchecked(3));
