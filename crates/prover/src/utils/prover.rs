@@ -1,7 +1,10 @@
+use std::simd::cmp::SimdPartialEq;
 use std::simd::Simd;
 
 use num_traits::Zero;
+use stwo_prover::core::backend::simd::cm31::PackedCM31;
 use stwo_prover::core::backend::simd::m31::PackedM31;
+use stwo_prover::core::backend::simd::qm31::PackedQM31;
 use stwo_prover::core::fields::m31::M31;
 
 pub fn divmod(x: PackedM31, divisor: u32) -> (PackedM31, PackedM31) {
@@ -49,4 +52,27 @@ mod tests {
             .zip(flags)
             .all(|(x, y)| (x - y).is_zero()));
     }
+}
+
+// TODO(Gilad): use EqExtend from stwo-cairo.
+pub fn nonzero_mask_packed_m31(m: PackedM31) -> PackedM31 {
+    let ones = Simd::splat(1u32);
+    let zeros = Simd::splat(0u32);
+    let mask = m.into_simd().simd_ne(Simd::splat(0));
+    unsafe { PackedM31::from_simd_unchecked(mask.select(ones, zeros)) }
+}
+
+// TODO(Gilad): use EqExtend from stwo-cairo.
+pub fn nonozero_mask_packed_cm31(cm: PackedCM31) -> PackedCM31 {
+    let [m0, m1] = cm.0;
+    PackedCM31([nonzero_mask_packed_m31(m0), nonzero_mask_packed_m31(m1)])
+}
+
+// TODO(Gilad): use EqExtend from stwo-cairo.
+pub fn nonzero_mask_packed_QM31(qm: PackedQM31) -> PackedQM31 {
+    let [cm0, cm1] = qm.0;
+    PackedQM31([
+        nonozero_mask_packed_cm31(cm0),
+        nonozero_mask_packed_cm31(cm1),
+    ])
 }
