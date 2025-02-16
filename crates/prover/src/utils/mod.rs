@@ -1,5 +1,6 @@
 pub mod component;
 pub mod prover;
+pub mod types;
 
 use std::ops::{Add, Mul, Sub};
 
