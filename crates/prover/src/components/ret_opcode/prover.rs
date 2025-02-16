@@ -1,28 +1,30 @@
 use itertools::{zip_eq, Itertools};
-use num_traits::One;
+use num_traits::{One, Zero};
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use stwo_air_utils::trace::component_trace::ComponentTrace;
+use stwo_air_utils_derive::{IterMut, ParIterMut, Uninitialized};
 use stwo_prover::constraint_framework::logup::LogupTraceGenerator;
 use stwo_prover::constraint_framework::Relation;
 use stwo_prover::core::backend::simd::m31::{PackedM31, LOG_N_LANES, N_LANES};
 use stwo_prover::core::backend::simd::qm31::PackedQM31;
 use stwo_prover::core::backend::simd::SimdBackend;
-use stwo_prover::core::backend::{Col, Column};
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::pcs::TreeBuilder;
-use stwo_prover::core::poly::circle::{CanonicCoset, CircleEvaluation};
-use stwo_prover::core::poly::BitReversedOrder;
 use stwo_prover::core::utils::bit_reverse_coset_to_circle_domain_order;
 use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleChannel;
 
 use super::component::{Claim, InteractionClaim, RET_INSTRUCTION};
 use crate::components::memory;
-use crate::components::ret_opcode::component::RET_N_TRACE_CELLS;
 use crate::input::instructions::VmState;
-use crate::relations::MemoryRelation;
+use crate::relations::{MemoryRelation, StateRelation, N_MEMORY_ELEMS, STATE_SIZE};
 
-const N_MEMORY_CALLS: usize = 3;
+const N_TRACE_COLUMNS: usize = 5;
+
+const N_MEMORY_LOOKUPS: usize = 3;
+const N_STATE_LOOKUPS: usize = 2;
 
 // TODO(Ohad): take from prover_types and remove.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PackedCasmState {
     pub pc: PackedM31,
     pub ap: PackedM31,
@@ -38,11 +40,11 @@ impl ClaimGenerator {
         assert!(!inputs.is_empty());
 
         // TODO(spapini): Split to multiple components.
-        let n_calls = inputs.len();
-        assert_ne!(n_calls, 0);
-        let size = std::cmp::max(n_calls.next_power_of_two(), N_LANES);
+        let n_rows = inputs.len();
+        assert_ne!(n_rows, 0);
+        let size = std::cmp::max(n_rows.next_power_of_two(), N_LANES);
         inputs.resize(size, inputs[0]);
-        let need_padding = n_calls != size;
+        let need_padding = n_rows != size;
 
         if need_padding {
             inputs.resize(size, *inputs.first().unwrap());
@@ -69,150 +71,139 @@ impl ClaimGenerator {
     }
 
     pub fn write_trace(
-        &self,
+        self,
         tree_builder: &mut TreeBuilder<'_, '_, SimdBackend, Blake2sMerkleChannel>,
         memory_trace_generator: &mut memory::ClaimGenerator,
     ) -> (Claim, InteractionClaimGenerator) {
-        let (trace, interaction_prover) = write_trace_simd(&self.inputs, memory_trace_generator);
-        interaction_prover.memory_inputs.iter().for_each(|c| {
+        let (trace, lookup_data) = write_trace_simd(&self.inputs, memory_trace_generator);
+
+        let n_rows = self.inputs.len();
+        assert_ne!(n_rows, 0);
+
+        lookup_data.memory.iter().for_each(|c| {
             c.iter()
-                .for_each(|v| memory_trace_generator.add_inputs_simd(v))
+                .for_each(|v| memory_trace_generator.add_inputs_simd(&v[0]))
         });
-        tree_builder.extend_evals(trace);
-        let claim = Claim {
-            n_rets: self.inputs.len() * N_LANES,
-        };
-        (claim, interaction_prover)
+        tree_builder.extend_evals(trace.to_evals());
+        (
+            Claim { n_rows },
+            InteractionClaimGenerator {
+                n_rows,
+                lookup_data,
+            },
+        )
     }
 }
+#[derive(Debug, Uninitialized, IterMut, ParIterMut)]
+pub struct LookupData {
+    pub memory: [Vec<[PackedM31; N_MEMORY_ELEMS]>; N_MEMORY_LOOKUPS],
+    pub state: [Vec<[PackedM31; STATE_SIZE]>; N_STATE_LOOKUPS],
+}
 
+#[derive(Debug)]
 pub struct InteractionClaimGenerator {
-    pub memory_inputs: [Vec<PackedM31>; N_MEMORY_CALLS],
-    pub memory_outputs: [Vec<PackedQM31>; N_MEMORY_CALLS],
-    // Callee data.
-    // pc: Vec<PackedM31>,
-    // fp: Vec<PackedM31>,
-    // instr: Vec<PackedM31>,
-    // new_pc: Vec<PackedM31>,
-    // new_fp: Vec<PackedM31>,
+    pub n_rows: usize,
+    pub lookup_data: LookupData,
 }
-impl InteractionClaimGenerator {
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self {
-            memory_inputs: [
-                Vec::with_capacity(capacity),
-                Vec::with_capacity(capacity),
-                Vec::with_capacity(capacity),
-            ],
-            memory_outputs: [
-                Vec::with_capacity(capacity),
-                Vec::with_capacity(capacity),
-                Vec::with_capacity(capacity),
-            ],
-        }
-    }
 
+impl InteractionClaimGenerator {
     pub fn write_interaction_trace(
         &self,
         tree_builder: &mut TreeBuilder<'_, '_, SimdBackend, Blake2sMerkleChannel>,
-        lookup_elements: &MemoryRelation,
+        memory_relation: &MemoryRelation,
+        state_relation: &StateRelation,
     ) -> InteractionClaim {
-        let log_size = self.memory_inputs[0].len().ilog2() + LOG_N_LANES;
+        let log_size = std::cmp::max(self.n_rows.next_power_of_two().ilog2(), LOG_N_LANES);
         let mut logup_gen = LogupTraceGenerator::new(log_size);
-        for col_index in 0..N_MEMORY_CALLS {
-            let mut col_gen = logup_gen.new_col();
-            for (i, (&addr, &output)) in zip_eq(
-                &self.memory_inputs[col_index],
-                &self.memory_outputs[col_index],
-            )
-            .enumerate()
-            {
-                let address_and_value = vec![addr, output.into_packed_m31s()[0]];
-                let denom = lookup_elements.combine(&address_and_value);
-                col_gen.write_frac(i, PackedQM31::one(), denom);
-            }
-            col_gen.finalize_col();
+
+        let mut col0 = logup_gen.new_col();
+        let state_use = &self.lookup_data.state[0];
+        let read_pc = &self.lookup_data.memory[0];
+        for (i, (x, y)) in zip_eq(state_use, read_pc).enumerate() {
+            let denom_x: PackedQM31 = state_relation.combine(x);
+            let denom_y: PackedQM31 = memory_relation.combine(y);
+
+            col0.write_frac(i, denom_x + denom_y, denom_x * denom_y)
         }
-        let (trace, claimed_sum) = logup_gen.finalize_last();
+        col0.finalize_col();
+
+        let mut col_gen = logup_gen.new_col();
+        let state_yield = &self.lookup_data.state[1];
+        for (i, values) in state_yield.iter().enumerate() {
+            let denom: PackedQM31 = state_relation.combine(values);
+            col_gen.write_frac(i, -PackedQM31::one(), denom);
+        }
+        col_gen.finalize_col();
+
+        let (trace, total_sum, claimed_sum) = if self.n_rows == 1 << log_size {
+            let (trace, claimed_sum) = logup_gen.finalize_last();
+            (trace, claimed_sum, None)
+        } else {
+            let (trace, [total_sum, claimed_sum]) =
+                logup_gen.finalize_at([(1 << log_size) - 1, self.n_rows - 1]);
+            (trace, total_sum, Some((claimed_sum, self.n_rows - 1)))
+        };
         tree_builder.extend_evals(trace);
 
         InteractionClaim {
             log_size,
-            claimed_sum,
+            logup_sums: (total_sum, claimed_sum),
         }
     }
 }
 
+// Ret trace row:
+// | pc | ap | fp | [fp-1] | [fp-2] |
 fn write_trace_simd(
     inputs: &[PackedCasmState],
     memory_trace_generator: &memory::ClaimGenerator,
-) -> (
-    Vec<CircleEvaluation<SimdBackend, M31, BitReversedOrder>>,
-    InteractionClaimGenerator,
-) {
-    let n_trace_columns = RET_N_TRACE_CELLS;
-    let mut trace_values = (0..n_trace_columns)
-        .map(|_| Col::<SimdBackend, M31>::zeros(inputs.len() * N_LANES))
-        .collect_vec();
-    let mut sub_components_inputs = InteractionClaimGenerator::with_capacity(inputs.len());
-    inputs.iter().enumerate().for_each(|(i, input)| {
-        write_trace_row(
-            &mut trace_values,
-            input,
-            i,
-            &mut sub_components_inputs,
-            memory_trace_generator,
-        );
-    });
+) -> (ComponentTrace<N_TRACE_COLUMNS>, LookupData) {
+    let log_n_packed_rows = inputs.len().ilog2();
+    let log_size = log_n_packed_rows + LOG_N_LANES;
+    let (mut trace, mut lookup_data) = unsafe {
+        (
+            ComponentTrace::<N_TRACE_COLUMNS>::uninitialized(log_size),
+            LookupData::uninitialized(log_n_packed_rows),
+        )
+    };
 
-    let trace = trace_values
-        .into_iter()
-        .map(|eval| {
-            // TODO(Ohad): Support non-power of 2 inputs.
-            let domain = CanonicCoset::new(
-                eval.len()
-                    .checked_ilog2()
-                    .expect("Input is not a power of 2!"),
-            )
-            .circle_domain();
-            CircleEvaluation::<SimdBackend, M31, BitReversedOrder>::new(domain, eval)
-        })
-        .collect_vec();
+    trace
+        .par_iter_mut()
+        .zip(inputs.par_iter())
+        .zip(lookup_data.par_iter_mut())
+        .for_each(|((row, ret_opcode_input), lookup_data)| {
+            let col0_pc = ret_opcode_input.pc;
+            *row[0] = col0_pc;
+            // Not added to memory inputs: `ap` not part of constraint yet.
+            let col1_ap = ret_opcode_input.ap;
+            *row[1] = col1_ap;
+            let col2_fp = ret_opcode_input.fp;
+            *row[2] = col2_fp;
+            let mem_fp_minus_one = memory_trace_generator
+                .deduce_output((col2_fp) - (PackedM31::broadcast(M31::one())));
 
-    (trace, sub_components_inputs)
-}
+            *lookup_data.state[0] = [col0_pc, col1_ap, col2_fp];
 
-// Ret trace row:
-// | pc | ap | fp | [fp-1] | [fp-2] |
-// TODO(Ohad): redo when air team decides how it should look.
-fn write_trace_row(
-    dst: &mut [Col<SimdBackend, M31>],
-    ret_opcode_input: &PackedCasmState,
-    row_index: usize,
-    lookup_data: &mut InteractionClaimGenerator,
-    memory_trace_generator: &memory::ClaimGenerator,
-) {
-    let col0_pc = ret_opcode_input.pc;
-    dst[0].data[row_index] = col0_pc;
-    // Not added to memory inputs: `ap` not part of constraint yet.
-    let col1_ap = ret_opcode_input.ap;
-    dst[1].data[row_index] = col1_ap;
-    let col2_fp = ret_opcode_input.fp;
-    dst[2].data[row_index] = col2_fp;
+            let col3 = mem_fp_minus_one;
+            *row[3] = col3.into_packed_m31s()[0];
+            let mem_fp_minus_two = memory_trace_generator
+                .deduce_output((col2_fp) - (PackedM31::broadcast(M31::from(2))));
 
-    lookup_data.memory_inputs[0].push(col0_pc);
-    lookup_data.memory_inputs[1].push((col2_fp) - (PackedM31::broadcast(M31::one())));
-    lookup_data.memory_outputs[0].push(PackedM31::broadcast(RET_INSTRUCTION).into());
-    let mem_fp_minus_one =
-        memory_trace_generator.deduce_output((col2_fp) - (PackedM31::broadcast(M31::one())));
-    lookup_data.memory_outputs[1].push(mem_fp_minus_one);
+            *lookup_data.memory[0] = std::array::from_fn(|i| match i {
+                0 => col0_pc,
+                1 => PackedM31::broadcast(RET_INSTRUCTION),
+                _ => PackedM31::zero(),
+            });
 
-    let col3 = mem_fp_minus_one;
-    dst[3].data[row_index] = col3.into_packed_m31s()[0];
-    lookup_data.memory_inputs[2].push((col2_fp) - (PackedM31::broadcast(M31::from(2))));
-    let mem_fp_minus_two =
-        memory_trace_generator.deduce_output((col2_fp) - (PackedM31::broadcast(M31::from(2))));
-    lookup_data.memory_outputs[2].push(mem_fp_minus_two);
-    let col4 = mem_fp_minus_two;
-    dst[4].data[row_index] = col4.into_packed_m31s()[0];
+            let [v0, v1, v2, v3] = mem_fp_minus_one.into_packed_m31s();
+            *lookup_data.memory[1] = [col2_fp - PackedM31::broadcast(M31::one()), v0, v1, v2, v3];
+
+            let [v0, v1, v2, v3] = mem_fp_minus_two.into_packed_m31s();
+            *lookup_data.memory[2] = [col2_fp - PackedM31::broadcast(M31::from(2)), v0, v1, v2, v3];
+
+            let col4 = mem_fp_minus_two;
+            *row[4] = col4.into_packed_m31s()[0];
+        });
+
+    (trace, lookup_data)
 }

@@ -1,63 +1,49 @@
 use num_traits::One;
 use serde::{Deserialize, Serialize};
-use stwo_prover::constraint_framework::{
-    EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
-};
+use stwo_prover::constraint_framework::logup::LogupSums;
+use stwo_prover::constraint_framework::{EvalAtRow, FrameworkComponent, RelationEntry};
 use stwo_prover::core::channel::Channel;
 use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fields::qm31::SecureField;
 use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
 use stwo_prover::core::pcs::TreeVec;
 
-use crate::relations::MemoryRelation;
+use crate::relations::{MemoryRelation, StateRelation};
+use crate::utils::component::log_size;
 
 pub const RET_N_TRACE_CELLS: usize = 5;
-// pub const RET_INSTRUCTION: [u32; N_M31_IN_FELT252] = [
-//     510, 447, 511, 495, 511, 91, 130, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-// 0, ];
-pub const RET_INSTRUCTION: M31 = M31::from_u32_unchecked(171);
+// TODO(alont): set instruction bases to not overlap
+pub const RET_INSTRUCTION: M31 = M31::from_u32_unchecked(0);
 pub type Component = FrameworkComponent<Eval>;
 
 #[derive(Clone)]
 pub struct Eval {
-    pub log_n_rows: u32,
+    pub claim: Claim,
     pub memory_lookup: MemoryRelation,
-    pub claimed_sum: SecureField,
+    pub state_lookup: StateRelation,
 }
+
 impl Eval {
-    pub fn new(
-        ret_claim: Claim,
-        memory_lookup: MemoryRelation,
-        interaction_claim: InteractionClaim,
-    ) -> Self {
-        Self {
-            log_n_rows: ret_claim.n_rets.next_power_of_two().ilog2(),
-            memory_lookup,
-            claimed_sum: interaction_claim.claimed_sum,
-        }
-    }
-}
-
-impl FrameworkEval for Eval {
-    fn log_size(&self) -> u32 {
-        self.log_n_rows
+    pub fn log_size(&self) -> u32 {
+        log_size(self.claim.n_rows)
     }
 
-    fn max_constraint_log_degree_bound(&self) -> u32 {
+    pub fn max_constraint_log_degree_bound(&self) -> u32 {
         self.log_size() + 1
     }
 
-    fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
-        // PC column.
-        let pc = eval.next_trace_mask();
+    pub fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
+        // Initial state.
+        let state = std::array::from_fn(|_| eval.next_trace_mask());
+        // Use initial state.
+        eval.add_to_relation(RelationEntry::new(&self.state_lookup, E::EF::one(), &state));
+        let [pc, ap, fp] = state;
+
+        // Lookup pc.
         eval.add_to_relation(RelationEntry::new(
             &self.memory_lookup,
             E::EF::one(),
             &[pc, RET_INSTRUCTION.into()],
         ));
-
-        let _ap = eval.next_trace_mask();
-        let fp = eval.next_trace_mask();
 
         // FP - 1
         let fp_minus_one = fp.clone() - E::F::one();
@@ -65,7 +51,7 @@ impl FrameworkEval for Eval {
         eval.add_to_relation(RelationEntry::new(
             &self.memory_lookup,
             E::EF::one(),
-            &[fp_minus_one, fp_minus_one_val],
+            &[fp_minus_one, fp_minus_one_val.clone()],
         ));
 
         // FP - 2
@@ -74,27 +60,34 @@ impl FrameworkEval for Eval {
         eval.add_to_relation(RelationEntry::new(
             &self.memory_lookup,
             E::EF::one(),
-            &[fp_minus_two, fp_minus_two_val],
+            &[fp_minus_two, fp_minus_two_val.clone()],
+        ));
+        let new_pc = fp_minus_one_val;
+        let new_fp = fp_minus_two_val;
+
+        let new_state = [new_pc, ap, new_fp];
+        eval.add_to_relation(RelationEntry::new(
+            &self.state_lookup,
+            -E::EF::one(),
+            &new_state,
         ));
 
-        // TODO(giladchase): Add state lookups.
-
-        eval.finalize_logup();
+        eval.finalize_logup_in_pairs();
         eval
     }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Claim {
-    pub n_rets: usize,
+    pub n_rows: usize,
 }
 impl Claim {
     pub fn mix_into(&self, channel: &mut impl Channel) {
-        channel.mix_u64(self.n_rets as u64);
+        channel.mix_u64(self.n_rows as u64);
     }
 
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
-        let log_size = self.n_rets.next_power_of_two().ilog2();
+        let log_size = self.n_rows.next_power_of_two().ilog2();
         let interaction_0_log_sizes = vec![log_size; RET_N_TRACE_CELLS];
         let interaction_1_log_sizes = vec![log_size; SECURE_EXTENSION_DEGREE * 3];
         let fixed_log_sizes = vec![log_size];
@@ -109,10 +102,15 @@ impl Claim {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct InteractionClaim {
     pub log_size: u32,
-    pub claimed_sum: SecureField,
+    pub logup_sums: LogupSums,
 }
 impl InteractionClaim {
     pub fn mix_into(&self, channel: &mut impl Channel) {
-        channel.mix_felts(&[self.claimed_sum]);
+        let (total_sum, claimed_sum) = self.logup_sums;
+        channel.mix_felts(&[total_sum]);
+        if let Some(claimed_sum) = claimed_sum {
+            channel.mix_felts(&[claimed_sum.0]);
+            channel.mix_u64(claimed_sum.1 as u64);
+        }
     }
 }
