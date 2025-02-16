@@ -138,20 +138,12 @@ impl InteractionClaimGenerator {
         }
         col2.finalize_col();
 
-        let (trace, total_sum, claimed_sum) = if self.n_calls == 1 << log_size {
-            let (trace, claimed_sum) = logup_gen.finalize_last();
-            (trace, claimed_sum, None)
-        } else {
-            let (trace, [total_sum, claimed_sum]) =
-                logup_gen.finalize_at([(1 << log_size) - 1, self.n_calls - 1]);
-            (trace, total_sum, Some((claimed_sum, self.n_calls - 1)))
-        };
-
+        let (trace, claimed_sum) = logup_gen.finalize_last();
         tree_builder.extend_evals(trace);
 
         InteractionClaim {
             log_size,
-            logup_sums: (total_sum, claimed_sum),
+            claimed_sum,
         }
     }
 }

@@ -11,7 +11,6 @@ mod tests {
     use num_traits::Zero;
     use rand::rngs::SmallRng;
     use rand::{Rng, SeedableRng};
-    use stwo_prover::constraint_framework::preprocessed_columns::gen_is_first;
     use stwo_prover::constraint_framework::{
         FrameworkComponent, FrameworkEval, TraceLocationAllocator,
     };
@@ -111,12 +110,6 @@ mod tests {
                 config, &twiddles,
             );
 
-        // Preprocessed trace.
-        let mut tree_builder = commitment_scheme.tree_builder();
-        let range_check_preprocessed_trace = gen_is_first::<SimdBackend>(LOG_HEIGHT);
-        tree_builder.extend_evals([range_check_preprocessed_trace]);
-        tree_builder.commit(channel);
-
         let mut tree_builder = commitment_scheme.tree_builder();
         let (claim, interaction_claim_generator) =
             claim_generator.write_trace(&mut tree_builder, &mut memory_claim_generator);
@@ -137,7 +130,7 @@ mod tests {
         let component = FrameworkComponent::new(
             trace_location_allocator,
             Eval::new(claim, memory_relation, state_relation),
-            interaction_claim.logup_sums,
+            interaction_claim.claimed_sum,
         );
 
         let trace_polys = commitment_scheme
@@ -151,7 +144,7 @@ mod tests {
             |eval| {
                 component.evaluate(eval);
             },
-            interaction_claim.logup_sums,
+            interaction_claim.claimed_sum,
         )
     }
 }
