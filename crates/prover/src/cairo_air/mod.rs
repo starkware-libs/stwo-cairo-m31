@@ -1,7 +1,6 @@
 use itertools::{chain, Itertools};
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
-use stwo_prover::constraint_framework::preprocessed_columns::gen_is_first;
 use stwo_prover::constraint_framework::{Relation, TraceLocationAllocator};
 use stwo_prover::core::air::{Component, ComponentProver};
 use stwo_prover::core::backend::simd::SimdBackend;
@@ -136,7 +135,7 @@ impl CairoComponents {
                         interaction_elements.addr_to_value_lookup.clone(),
                         interaction_claim.clone(),
                     ),
-                    (interaction_claim.claimed_sum, None),
+                    interaction_claim.claimed_sum,
                 )
             })
             .collect_vec();
@@ -148,7 +147,7 @@ impl CairoComponents {
                 interaction_elements.addr_to_value_lookup.clone(),
                 interaction_claim.addr_to_value.clone(),
             ),
-            (interaction_claim.addr_to_value.clone().claimed_sum, None),
+            interaction_claim.addr_to_value.clone().claimed_sum,
         );
         Self {
             ret: ret_components,
@@ -252,21 +251,6 @@ pub fn prove_cairo(input: CairoInput) -> Result<CairoProof<Blake2sMerkleHasher>,
         &interaction_claim
     ));
     interaction_claim.mix_into(channel);
-    tree_builder.commit(channel);
-
-    // Fixed trace.
-    let mut tree_builder = commitment_scheme.tree_builder();
-    let addr_to_value_constant_trace =
-        gen_is_first::<SimdBackend>(claim.addr_to_value.log_sizes()[2][0]);
-    let range_check9_9_constant_trace = gen_is_first::<SimdBackend>(18);
-    tree_builder.extend_evals(
-        [
-            vec![addr_to_value_constant_trace],
-            vec![range_check9_9_constant_trace],
-        ]
-        .into_iter()
-        .flatten(),
-    );
     tree_builder.commit(channel);
 
     // Component provers.

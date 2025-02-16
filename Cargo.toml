@@ -28,7 +28,7 @@ serde_json = "1.0.1"
 sonic-rs = "0.3.10"
 starknet-ff = "0.3.7"
 # TODO(ShaharS): take stwo version from the source repository.
-stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "bede666c" }
+stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "81d1fe3" }
 thiserror = "1.0.63"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
