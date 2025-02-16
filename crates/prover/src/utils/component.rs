@@ -1,7 +1,8 @@
 use std::ops::{Add, Mul};
 
 use num_traits::One;
-use stwo_prover::core::fields::m31::M31;
+use stwo_prover::constraint_framework::EvalAtRow;
+use stwo_prover::core::fields::m31::{BaseField, M31};
 
 /// Decodes an opcode to its base and flags. Returns the opcode.
 /// `flags` is a list of pairs `(flag, n_variants)`, where `flag` is the flag value and
@@ -17,6 +18,16 @@ where
         flag_shift *= M31(*n_variants);
     }
     opcode
+}
+
+/// Assert that `flag` is a trit (a digit in {0,1,2}).
+pub fn is_trit<E: EvalAtRow>(flag: &E::F) -> E::F {
+    let two = E::F::from(BaseField::from_u32_unchecked(2));
+    let three = E::F::from(BaseField::from_u32_unchecked(3));
+    let f = || flag.clone();
+
+    // is_trit(f) := (f - 2) * (f - 1) * (f)  ==expands into==>  f^3 - 3*f^2 + 2*f.
+    f() * f() * f() - three * f() * f() + two * f()
 }
 
 #[cfg(test)]
