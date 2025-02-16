@@ -1,13 +1,13 @@
 use itertools::{chain, Itertools};
 use num_traits::One;
 use serde::{Deserialize, Serialize};
-use stwo_prover::constraint_framework::logup::LogupSums;
 use stwo_prover::constraint_framework::{
     EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
 };
 use stwo_prover::core::backend::simd::m31::LOG_N_LANES;
 use stwo_prover::core::channel::Channel;
 use stwo_prover::core::fields::m31::M31;
+use stwo_prover::core::fields::qm31::SecureField;
 use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
 use stwo_prover::core::pcs::TreeVec;
 
@@ -176,15 +176,10 @@ impl Claim {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct InteractionClaim {
     pub log_size: u32,
-    pub logup_sums: LogupSums,
+    pub claimed_sum: SecureField,
 }
 impl InteractionClaim {
     pub fn mix_into(&self, channel: &mut impl Channel) {
-        let (total_sum, claimed_sum) = self.logup_sums;
-        channel.mix_felts(&[total_sum]);
-        if let Some(claimed_sum) = claimed_sum {
-            channel.mix_felts(&[claimed_sum.0]);
-            channel.mix_u64(claimed_sum.1 as u64);
-        }
+        channel.mix_felts(&[self.claimed_sum]);
     }
 }
