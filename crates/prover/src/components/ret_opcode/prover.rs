@@ -13,7 +13,7 @@ use stwo_prover::core::pcs::TreeBuilder;
 use stwo_prover::core::utils::bit_reverse_coset_to_circle_domain_order;
 use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleChannel;
 
-use super::component::{Claim, InteractionClaim, RET_INSTRUCTION};
+use super::component::{Claim, InteractionClaim, INSTRUCTION_BASE};
 use crate::components::memory;
 use crate::input::instructions::VmState;
 use crate::relations::{MemoryRelation, StateRelation, N_MEMORY_ELEMS, STATE_SIZE};
@@ -77,7 +77,7 @@ impl ClaimGenerator {
     ) -> (Claim, InteractionClaimGenerator) {
         let (trace, lookup_data) = write_trace_simd(&self.inputs, memory_trace_generator);
 
-        let n_rows = self.inputs.len();
+        let n_rows = self.inputs.len() * N_LANES;
         assert_ne!(n_rows, 0);
 
         lookup_data.memory.iter().for_each(|c| {
@@ -116,9 +116,13 @@ impl InteractionClaimGenerator {
         let log_size = std::cmp::max(self.n_rows.next_power_of_two().ilog2(), LOG_N_LANES);
         let mut logup_gen = LogupTraceGenerator::new(log_size);
 
-        let mut col0 = logup_gen.new_col();
         let state_use = &self.lookup_data.state[0];
         let read_pc = &self.lookup_data.memory[0];
+        let fp_minus_one = &self.lookup_data.memory[1];
+        let fp_minus_two = &self.lookup_data.memory[2];
+        let state_yield = &self.lookup_data.state[1];
+
+        let mut col0 = logup_gen.new_col();
         for (i, (x, y)) in zip_eq(state_use, read_pc).enumerate() {
             let denom_x: PackedQM31 = state_relation.combine(x);
             let denom_y: PackedQM31 = memory_relation.combine(y);
@@ -127,13 +131,22 @@ impl InteractionClaimGenerator {
         }
         col0.finalize_col();
 
-        let mut col_gen = logup_gen.new_col();
-        let state_yield = &self.lookup_data.state[1];
-        for (i, values) in state_yield.iter().enumerate() {
-            let denom: PackedQM31 = state_relation.combine(values);
-            col_gen.write_frac(i, -PackedQM31::one(), denom);
+        let mut col1 = logup_gen.new_col();
+        for (i, (x, y)) in zip_eq(fp_minus_one, fp_minus_two).enumerate() {
+            let denom_x: PackedQM31 = memory_relation.combine(x);
+            let denom_y: PackedQM31 = memory_relation.combine(y);
+
+            col1.write_frac(i, denom_x + denom_y, denom_x * denom_y)
         }
-        col_gen.finalize_col();
+        col1.finalize_col();
+
+        let mut col2 = logup_gen.new_col();
+        for (i, x) in state_yield.iter().enumerate() {
+            let denom_x: PackedQM31 = state_relation.combine(x);
+
+            col2.write_frac(i, -PackedQM31::one(), denom_x)
+        }
+        col2.finalize_col();
 
         let (trace, claimed_sum) = logup_gen.finalize_last();
         tree_builder.extend_evals(trace);
@@ -164,13 +177,13 @@ fn write_trace_simd(
         .par_iter_mut()
         .zip(inputs.par_iter())
         .zip(lookup_data.par_iter_mut())
-        .for_each(|((row, ret_opcode_input), lookup_data)| {
-            let col0_pc = ret_opcode_input.pc;
+        .for_each(|((row, input), lookup_data)| {
+            let col0_pc = input.pc;
             *row[0] = col0_pc;
             // Not added to memory inputs: `ap` not part of constraint yet.
-            let col1_ap = ret_opcode_input.ap;
+            let col1_ap = input.ap;
             *row[1] = col1_ap;
-            let col2_fp = ret_opcode_input.fp;
+            let col2_fp = input.fp;
             *row[2] = col2_fp;
             let mem_fp_minus_one = memory_trace_generator
                 .deduce_output((col2_fp) - (PackedM31::broadcast(M31::one())));
@@ -184,18 +197,31 @@ fn write_trace_simd(
 
             *lookup_data.memory[0] = std::array::from_fn(|i| match i {
                 0 => col0_pc,
-                1 => PackedM31::broadcast(RET_INSTRUCTION),
+                1 => PackedM31::broadcast(INSTRUCTION_BASE),
                 _ => PackedM31::zero(),
             });
 
-            let [v0, v1, v2, v3] = mem_fp_minus_one.into_packed_m31s();
-            *lookup_data.memory[1] = [col2_fp - PackedM31::broadcast(M31::one()), v0, v1, v2, v3];
+            let [new_pc, _, _, _] = mem_fp_minus_one.into_packed_m31s();
+            *lookup_data.memory[1] = [
+                col2_fp - PackedM31::broadcast(M31::one()),
+                new_pc,
+                PackedM31::zero(),
+                PackedM31::zero(),
+                PackedM31::zero(),
+            ];
 
-            let [v0, v1, v2, v3] = mem_fp_minus_two.into_packed_m31s();
-            *lookup_data.memory[2] = [col2_fp - PackedM31::broadcast(M31::from(2)), v0, v1, v2, v3];
+            let [new_fp, _, _, _] = mem_fp_minus_two.into_packed_m31s();
+            *lookup_data.memory[2] = [
+                col2_fp - PackedM31::broadcast(M31::from(2)),
+                new_fp,
+                PackedM31::zero(),
+                PackedM31::zero(),
+                PackedM31::zero(),
+            ];
 
             let col4 = mem_fp_minus_two;
             *row[4] = col4.into_packed_m31s()[0];
+            *lookup_data.state[1] = [new_pc, input.ap, new_fp];
         });
 
     (trace, lookup_data)
