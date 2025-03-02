@@ -11,10 +11,10 @@ use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
 use stwo_prover::core::pcs::TreeVec;
 
 use crate::relations::{MemoryRelation, StateRelation};
-use crate::utils::component::{decode_opcode, is_bit};
+use crate::utils::component::{decode_opcode, is_bit, is_trit};
 use crate::utils::{Selector, SelectorTrait};
 
-pub const N_TRACE_COLUMNS: usize = 27;
+pub const N_TRACE_COLUMNS: usize = 31;
 // TODO(alont): set instruction bases to not overlap
 pub const INSTRUCTION_BASE: M31 = M31::from_u32_unchecked(0);
 
@@ -60,11 +60,11 @@ impl FrameworkEval for Eval {
 
         // Assert flags are in range.
         let [op_type, reg0, reg1, reg2, appp] = std::array::from_fn(|_| eval.next_trace_mask());
-        eval.add_constraint(op_type.clone() * op_type.clone() - op_type.clone());
-        eval.add_constraint(reg0.clone() * reg0.clone() - reg0.clone());
-        eval.add_constraint(reg1.clone() * reg1.clone() - reg1.clone());
-        eval.add_constraint(reg2.clone() * reg2.clone() - reg2.clone());
-        eval.add_constraint(appp.clone() * appp.clone() - appp.clone());
+        eval.add_constraint(is_bit::<E>(&op_type));
+        eval.add_constraint(is_bit::<E>(&reg0));
+        eval.add_constraint(is_bit::<E>(&reg1));
+        eval.add_constraint(is_trit::<E>(&reg2));
+        eval.add_constraint(is_bit::<E>(&appp));
 
         // Check instruction.
         let [off0, off1, off2] = std::array::from_fn(|_| eval.next_trace_mask());
@@ -74,7 +74,7 @@ impl FrameworkEval for Eval {
                 (op_type.clone(), 2), // [add, mul]
                 (reg0.clone(), 2),    // [ap, fp]
                 (reg1.clone(), 2),    // [ap, fp]
-                (reg2.clone(), 2),    // [ap, fp]
+                (reg2.clone(), 3),    // [ap, fp, ddrf]
                 (appp.clone(), 2),    // [false, true]
             ],
         );
@@ -95,6 +95,12 @@ impl FrameworkEval for Eval {
         let [dst_address, lhs_address, rhs_address] =
             std::array::from_fn(|_| eval.next_trace_mask());
 
+        // Read memory.
+        let dst_val_arr: [E::F; 4] = std::array::from_fn(|_| eval.next_trace_mask());
+        let lhs_val_arr: [E::F; 4] = std::array::from_fn(|_| eval.next_trace_mask());
+        let rhs_val_arr: [E::F; 4] = std::array::from_fn(|_| eval.next_trace_mask());
+        let corrected_rhs_val_arr: [E::F; 4] = std::array::from_fn(|_| eval.next_trace_mask());
+
         eval.add_constraint(
             dst_address.clone() - (Selector::select(&reg0, [&ap, &fp]) + off0.clone()),
         );
@@ -102,13 +108,9 @@ impl FrameworkEval for Eval {
             lhs_address.clone() - (Selector::select(&reg1, [&ap, &fp]) + off1.clone()),
         );
         eval.add_constraint(
-            rhs_address.clone() - (Selector::select(&reg2, [&ap, &fp]) + off2.clone()),
+            rhs_address.clone()
+                - (Selector::select(&reg2, [&ap, &fp, &lhs_val_arr[0]]) + off2.clone()),
         );
-
-        // Read memory.
-        let dst_val_arr: [E::F; 4] = std::array::from_fn(|_| eval.next_trace_mask());
-        let lhs_val_arr: [E::F; 4] = std::array::from_fn(|_| eval.next_trace_mask());
-        let rhs_val_arr: [E::F; 4] = std::array::from_fn(|_| eval.next_trace_mask());
 
         eval.add_to_relation(RelationEntry::new(
             &self.memory_lookup,
@@ -131,6 +133,15 @@ impl FrameworkEval for Eval {
         let dst_val = E::combine_ef(dst_val_arr);
         let lhs_val = E::combine_ef(lhs_val_arr);
         let rhs_val = E::combine_ef(rhs_val_arr);
+        let corrected_rhs_val = E::combine_ef(corrected_rhs_val_arr);
+        
+        eval.add_constraint(
+            corrected_rhs_val.clone()
+                - Selector::select(
+                    &E::EF::from(reg2.clone()),
+                    [&rhs_val, &rhs_val, &(rhs_val.clone() - lhs_val.clone())],
+                ),
+        );
 
         // Apply operation.
         eval.add_constraint(
@@ -138,8 +149,8 @@ impl FrameworkEval for Eval {
                 - (Selector::select(
                     &E::EF::from(op_type),
                     [
-                        &(lhs_val.clone() + rhs_val.clone()),
-                        &(lhs_val.clone() * rhs_val.clone()),
+                        &(lhs_val.clone() + corrected_rhs_val.clone()),
+                        &(lhs_val.clone() * corrected_rhs_val.clone()),
                     ],
                 )),
         );

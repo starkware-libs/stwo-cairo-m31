@@ -79,7 +79,7 @@ impl ClaimGenerator {
                 *lookup_data.memory[0] = [input.pc, opcode, off0, off1, off2];
 
                 let [op_type, reg0, reg1, reg2, appp] =
-                    decode_opcode(INSTRUCTION_BASE, opcode, [2, 2, 2, 2, 2]);
+                    decode_opcode(INSTRUCTION_BASE, opcode, [2, 2, 2, 3, 2]);
 
                 *row[4] = op_type;
                 *row[5] = reg0;
@@ -92,25 +92,27 @@ impl ClaimGenerator {
                 *row[10] = off1;
                 *row[11] = off2;
 
-                // Addresses
+                // Addresses & values
                 let dst_addr = Selector::select(&reg0, [&input.ap, &input.fp]) + off0;
+                let [dst0, dst1, dst2, dst3] = memory_trace_generator
+                    .deduce_output(dst_addr)
+                    .into_packed_m31s();
+
                 let lhs_addr = Selector::select(&reg1, [&input.ap, &input.fp]) + off1;
-                let rhs_addr = Selector::select(&reg2, [&input.ap, &input.fp]) + off2;
+                let [lhs0, lhs1, lhs2, lhs3] = memory_trace_generator
+                    .deduce_output(lhs_addr)
+                    .into_packed_m31s();
+
+                let rhs_addr = Selector::select(&reg2, [&input.ap, &input.fp, &lhs0]) + off2;
+                let [rhs0, rhs1, rhs2, rhs3] = memory_trace_generator
+                    .deduce_output(rhs_addr)
+                    .into_packed_m31s();
 
                 *row[12] = dst_addr;
                 *row[13] = lhs_addr;
                 *row[14] = rhs_addr;
 
                 // Values
-                let [dst0, dst1, dst2, dst3] = memory_trace_generator
-                    .deduce_output(dst_addr)
-                    .into_packed_m31s();
-                let [lhs0, lhs1, lhs2, lhs3] = memory_trace_generator
-                    .deduce_output(lhs_addr)
-                    .into_packed_m31s();
-                let [rhs0, rhs1, rhs2, rhs3] = memory_trace_generator
-                    .deduce_output(rhs_addr)
-                    .into_packed_m31s();
 
                 *row[15] = dst0;
                 *row[16] = dst1;
@@ -126,6 +128,11 @@ impl ClaimGenerator {
                 *row[24] = rhs1;
                 *row[25] = rhs2;
                 *row[26] = rhs3;
+
+                *row[27] = Selector::select(&reg2, [&rhs0, &rhs0, &(rhs0 - lhs0)]);
+                *row[28] = Selector::select(&reg2, [&rhs1, &rhs1, &(rhs1 - lhs1)]);
+                *row[29] = Selector::select(&reg2, [&rhs2, &rhs2, &(rhs2 - lhs2)]);
+                *row[30] = Selector::select(&reg2, [&rhs3, &rhs3, &(rhs3 - lhs3)]);
 
                 *lookup_data.memory[1] = [dst_addr, dst0, dst1, dst2, dst3];
                 *lookup_data.memory[2] = [lhs_addr, lhs0, lhs1, lhs2, lhs3];

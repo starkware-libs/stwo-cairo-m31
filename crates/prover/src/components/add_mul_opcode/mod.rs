@@ -37,27 +37,37 @@ mod tests {
         let mut rng = SmallRng::seed_from_u64(0);
 
         #[allow(clippy::erasing_op, clippy::identity_op)]
-        let add_ap_ap_fp = INSTRUCTION_BASE + M31(0 + 0 * 2 + 1 * 4 + 1 * 8 + 0 * 16);
+        let add_ap_ap_fp = INSTRUCTION_BASE + M31(0 + 0 * 2 + 1 * 4 + 1 * 8 + 0 * 24);
         #[allow(clippy::erasing_op, clippy::identity_op)]
-        let mul_fp_fp_ap_appp = INSTRUCTION_BASE + M31(1 + 1 * 2 + 1 * 4 + 0 * 8 + 1 * 16);
+        let mul_fp_fp_ap_appp = INSTRUCTION_BASE + M31(1 + 1 * 2 + 1 * 4 + 0 * 8 + 1 * 24);
+        #[allow(clippy::erasing_op, clippy::identity_op)]
+        let add_ap_fp_ddrf = INSTRUCTION_BASE + M31(0 + 0 * 2 + 1 * 4 + 2 * 8 + 0 * 24);
         let x: QM31 = rng.gen();
         let y: QM31 = rng.gen();
         let z: QM31 = rng.gen();
 
-        // Initialize at pc=0, ap=2, fp=4 with:
-        //  pc -> 0: [ap] = [fp] + [fp]
-        //        1: [fp + 1] = [fp + 2] * [ap + 1]; ap++
-        //  ap -> 2: 2X
-        //        3: Y
-        //  fp -> 4: X
-        //        5: Z * Y
-        //        6: Z
+        // Initialize at pc=0, ap=3, fp=6 with:
+        //  pc -> 0: [ap] = [fp + 2] + [fp + 2]
+        //        1: [fp + 3] = [fp + 4] * [ap + 2]; ap++
+        //        2: [ap] = [[fp]]
+        //  ap -> 3: 2X
+        //        4: X
+        //        5: Y
+        //  fp -> 6: 7
+        //        7: 8
+        //        8: X
+        //        9: Z * Y
+        //        10: Z
         let mut memory_claim_generator = memory::ClaimGenerator {
             values: [
-                QM31::from_m31_array([add_ap_ap_fp, M31(0), M31(0), M31(0)]),
-                QM31::from_m31_array([mul_fp_fp_ap_appp, M31(1), M31(2), M31(1)]),
+                QM31::from_m31_array([add_ap_ap_fp, M31(0), M31(2), M31(2)]),
+                QM31::from_m31_array([mul_fp_fp_ap_appp, M31(3), M31(4), M31(2)]),
+                QM31::from_m31_array([add_ap_fp_ddrf, M31(0), M31(0), M31(0)]),
                 x + x,
+                x,
                 y,
+                QM31::from_m31_array([M31(7), M31(0), M31(0), M31(0)]),
+                QM31::from_m31_array([M31(8), M31(0), M31(0), M31(0)]),
                 x,
                 z * y,
                 z,
@@ -75,18 +85,26 @@ mod tests {
                 vec![
                     CasmState {
                         pc: M31::from(0),
-                        ap: M31::from(2),
-                        fp: M31::from(4),
+                        ap: M31::from(3),
+                        fp: M31::from(6),
                     };
                     128
                 ],
                 vec![
                     CasmState {
                         pc: M31::from(1),
-                        ap: M31::from(2),
-                        fp: M31::from(4),
+                        ap: M31::from(3),
+                        fp: M31::from(6),
                     };
-                    128
+                    64
+                ],
+                vec![
+                    CasmState {
+                        pc: M31::from(2),
+                        ap: M31::from(4),
+                        fp: M31::from(6),
+                    };
+                    64
                 ]
             )
             .collect_vec(),
