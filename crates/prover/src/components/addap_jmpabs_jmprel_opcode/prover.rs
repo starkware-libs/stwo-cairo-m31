@@ -34,7 +34,7 @@ impl ClaimGenerator {
         assert!(!inputs.is_empty());
 
         // TODO(spapini): Split to multiple components.
-        let size = inputs.len().next_power_of_two();
+        let size = std::cmp::max(inputs.len().next_power_of_two(), N_LANES);
         inputs.resize(size, inputs[0].clone());
 
         let inputs = inputs

@@ -8,17 +8,15 @@ use stwo_prover::constraint_framework::Relation;
 use stwo_prover::core::backend::simd::m31::{PackedM31, LOG_N_LANES, N_LANES};
 use stwo_prover::core::backend::simd::qm31::PackedQM31;
 use stwo_prover::core::backend::simd::SimdBackend;
-use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::pcs::TreeBuilder;
 use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleChannel;
 
 use super::component::{Claim, InteractionClaim, INSTRUCTION_BASE};
 use crate::components::add_mul_opcode::component::N_TRACE_COLUMNS;
 use crate::components::memory;
-use crate::input::instructions::VmState;
 use crate::relations::{MemoryRelation, StateRelation, N_MEMORY_ELEMS, STATE_SIZE};
 use crate::utils::prover::decode_opcode;
-use crate::utils::types::PackedCasmState;
+use crate::utils::types::{CasmState, PackedCasmState};
 use crate::utils::{Selector, SelectorTrait};
 
 const N_MEMORY_LOOKUPS: usize = 4;
@@ -28,26 +26,20 @@ pub struct ClaimGenerator {
     pub inputs: Vec<PackedCasmState>,
 }
 impl ClaimGenerator {
-    pub fn new(mut inputs: Vec<VmState>) -> Self {
+    pub fn new(mut inputs: Vec<CasmState>) -> Self {
         assert!(!inputs.is_empty());
 
         // TODO(spapini): Split to multiple components.
-        let size = inputs.len().next_power_of_two();
-        inputs.resize(size, inputs[0]);
+        let size = std::cmp::max(inputs.len().next_power_of_two(), N_LANES);
+        inputs.resize(size, inputs[0].clone());
 
         let inputs = inputs
             .into_iter()
             .array_chunks::<N_LANES>()
             .map(|chunk| PackedCasmState {
-                pc: PackedM31::from_array(std::array::from_fn(|i| {
-                    M31::from_u32_unchecked(chunk[i].pc)
-                })),
-                ap: PackedM31::from_array(std::array::from_fn(|i| {
-                    M31::from_u32_unchecked(chunk[i].ap)
-                })),
-                fp: PackedM31::from_array(std::array::from_fn(|i| {
-                    M31::from_u32_unchecked(chunk[i].fp)
-                })),
+                pc: PackedM31::from_array(std::array::from_fn(|i| chunk[i].pc)),
+                ap: PackedM31::from_array(std::array::from_fn(|i| chunk[i].ap)),
+                fp: PackedM31::from_array(std::array::from_fn(|i| chunk[i].fp)),
             })
             .collect_vec();
         Self { inputs }
