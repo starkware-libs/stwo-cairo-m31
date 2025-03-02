@@ -1,6 +1,8 @@
 use num_traits::One;
 use serde::{Deserialize, Serialize};
-use stwo_prover::constraint_framework::{EvalAtRow, FrameworkComponent, RelationEntry};
+use stwo_prover::constraint_framework::{
+    EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
+};
 use stwo_prover::core::channel::Channel;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::SecureField;
@@ -12,7 +14,7 @@ use crate::utils::component::log_size;
 
 pub const RET_N_TRACE_CELLS: usize = 5;
 // TODO(alont): set instruction bases to not overlap
-pub const RET_INSTRUCTION: M31 = M31::from_u32_unchecked(0);
+pub const INSTRUCTION_BASE: M31 = M31::from_u32_unchecked(0);
 pub type Component = FrameworkComponent<Eval>;
 
 #[derive(Clone)]
@@ -21,17 +23,26 @@ pub struct Eval {
     pub memory_lookup: MemoryRelation,
     pub state_lookup: StateRelation,
 }
-
 impl Eval {
-    pub fn log_size(&self) -> u32 {
+    pub fn new(claim: Claim, memory_lookup: MemoryRelation, state_lookup: StateRelation) -> Self {
+        Self {
+            claim: claim.clone(),
+            memory_lookup,
+            state_lookup,
+        }
+    }
+}
+
+impl FrameworkEval for Eval {
+    fn log_size(&self) -> u32 {
         log_size(self.claim.n_rows)
     }
 
-    pub fn max_constraint_log_degree_bound(&self) -> u32 {
+    fn max_constraint_log_degree_bound(&self) -> u32 {
         self.log_size() + 1
     }
 
-    pub fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
+    fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         // Initial state.
         let state = std::array::from_fn(|_| eval.next_trace_mask());
         // Use initial state.
@@ -42,7 +53,7 @@ impl Eval {
         eval.add_to_relation(RelationEntry::new(
             &self.memory_lookup,
             E::EF::one(),
-            &[pc, RET_INSTRUCTION.into()],
+            &[pc, INSTRUCTION_BASE.into()],
         ));
 
         // FP - 1
