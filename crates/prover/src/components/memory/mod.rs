@@ -31,7 +31,7 @@ mod tests {
             .into_iter()
             .map(BaseField::from)
             .collect_vec();
-        let expected_f31_mult: [u32; 16] = [1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let expected_f31_mult = vec![1, 2, 3, 0, 0, 0, 0, 0, 0, 0];
 
         for addr in address_usages {
             let value_index = memory.address_to_value_index[addr.0 as usize];

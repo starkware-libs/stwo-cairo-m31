@@ -5,6 +5,7 @@ use stwo_air_utils::trace::component_trace::ComponentTrace;
 use stwo_air_utils_derive::{IterMut, ParIterMut, Uninitialized};
 use stwo_prover::constraint_framework::logup::LogupTraceGenerator;
 use stwo_prover::constraint_framework::Relation;
+use stwo_prover::core::backend::simd::conversion::Pack;
 use stwo_prover::core::backend::simd::m31::{PackedM31, LOG_N_LANES, N_LANES};
 use stwo_prover::core::backend::simd::qm31::PackedQM31;
 use stwo_prover::core::backend::simd::SimdBackend;
@@ -16,7 +17,7 @@ use crate::components::add_mul_opcode::component::N_TRACE_COLUMNS;
 use crate::components::memory;
 use crate::relations::{MemoryRelation, StateRelation, N_MEMORY_ELEMS, STATE_SIZE};
 use crate::utils::prover::{decode_opcode, Enabler};
-use crate::utils::types::{CasmState, PackedCasmState};
+use crate::utils::types::CasmState;
 use crate::utils::{Selector, SelectorTrait};
 
 const N_MEMORY_LOOKUPS: usize = 4;
@@ -42,16 +43,12 @@ impl ClaimGenerator {
         let log_n_packed_rows = log_size - LOG_N_LANES;
 
         // Prepare inputs.
-        self.inputs.resize(size, self.inputs[0].clone());
+        self.inputs.resize(size, self.inputs[0]);
         let inputs = self
             .inputs
             .into_iter()
             .array_chunks::<N_LANES>()
-            .map(|chunk| PackedCasmState {
-                pc: PackedM31::from_array(std::array::from_fn(|i| chunk[i].pc)),
-                ap: PackedM31::from_array(std::array::from_fn(|i| chunk[i].ap)),
-                fp: PackedM31::from_array(std::array::from_fn(|i| chunk[i].fp)),
-            })
+            .map(Pack::pack)
             .collect_vec();
         let enabler = Enabler::new(n_rows);
 

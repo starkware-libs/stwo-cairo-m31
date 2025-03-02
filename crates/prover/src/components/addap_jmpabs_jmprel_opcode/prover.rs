@@ -5,6 +5,7 @@ use stwo_air_utils::trace::component_trace::ComponentTrace;
 use stwo_air_utils_derive::{IterMut, ParIterMut, Uninitialized};
 use stwo_prover::constraint_framework::logup::LogupTraceGenerator;
 use stwo_prover::constraint_framework::Relation;
+use stwo_prover::core::backend::simd::conversion::Pack;
 use stwo_prover::core::backend::simd::m31::{PackedM31, LOG_N_LANES, N_LANES};
 use stwo_prover::core::backend::simd::qm31::PackedQM31;
 use stwo_prover::core::backend::simd::SimdBackend;
@@ -13,7 +14,7 @@ use stwo_prover::core::pcs::TreeBuilder;
 use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleChannel;
 
 use super::component::{Claim, InteractionClaim};
-use crate::components::addap_jmpabs_jmprel_opcode::component::INSTRUCTION_BASE;
+use crate::components::addap_jmpabs_jmprel_opcode::component::ADD_AP_JMP_INSTRUCTION_BASE;
 use crate::components::memory;
 use crate::relations::{MemoryRelation, StateRelation, N_MEMORY_ELEMS, STATE_SIZE};
 use crate::utils::prover::decode_opcode;
@@ -26,37 +27,34 @@ const N_STATE_LOOKUPS: usize = 2;
 
 #[derive(Debug)]
 pub struct ClaimGenerator {
-    pub inputs: Vec<PackedCasmState>,
+    pub inputs: Vec<CasmState>,
 }
 impl ClaimGenerator {
-    pub fn new(mut inputs: Vec<CasmState>) -> Self {
-        assert!(!inputs.is_empty());
-
-        // TODO(spapini): Split to multiple components.
-        let size = std::cmp::max(inputs.len().next_power_of_two(), N_LANES);
-        inputs.resize(size, inputs[0].clone());
-
-        let inputs = inputs
-            .into_iter()
-            .array_chunks::<N_LANES>()
-            .map(|chunk| PackedCasmState {
-                pc: PackedM31::from_array(std::array::from_fn(|i| chunk[i].pc)),
-                ap: PackedM31::from_array(std::array::from_fn(|i| chunk[i].ap)),
-                fp: PackedM31::from_array(std::array::from_fn(|i| chunk[i].fp)),
-            })
-            .collect_vec();
-        Self { inputs }
+    pub fn new(inputs: Vec<CasmState>) -> Option<Self> {
+        if inputs.is_empty() {
+            return None;
+        };
+        Some(Self { inputs })
     }
 
     pub fn write_trace(
-        self,
+        mut self,
         tree_builder: &mut TreeBuilder<'_, '_, SimdBackend, Blake2sMerkleChannel>,
         memory_trace_generator: &mut memory::ClaimGenerator,
     ) -> (Claim, InteractionClaimGenerator) {
-        let (trace, lookup_data) = write_trace_simd(&self.inputs, memory_trace_generator);
-
         let n_rows = self.inputs.len();
-        assert_ne!(n_rows, 0);
+        let size = std::cmp::max(n_rows.next_power_of_two(), N_LANES);
+        let log_size = size.ilog2();
+
+        // Prepare inputs.
+        self.inputs.resize(size, self.inputs[0]);
+        let inputs = self
+            .inputs
+            .into_iter()
+            .array_chunks::<N_LANES>()
+            .map(Pack::pack)
+            .collect_vec();
+        let (trace, lookup_data) = write_trace_simd(&inputs, memory_trace_generator);
 
         lookup_data.memory.iter().for_each(|c| {
             c.iter()
@@ -64,9 +62,7 @@ impl ClaimGenerator {
         });
         tree_builder.extend_evals(trace.to_evals());
         (
-            Claim {
-                log_size: n_rows.ilog2(),
-            },
+            Claim { log_size },
             InteractionClaimGenerator {
                 n_rows,
                 lookup_data,
@@ -159,7 +155,7 @@ fn write_trace_simd(
                 memory_trace_generator.deduce_output(pc).into_packed_m31s();
             *lookup_data.memory[0] = [pc, opcode, imm, off0, off1];
 
-            let [op_type] = decode_opcode(INSTRUCTION_BASE, opcode, [3]);
+            let [op_type] = decode_opcode(M31(ADD_AP_JMP_INSTRUCTION_BASE), opcode, [3]);
 
             *row[3] = op_type;
             *row[4] = imm;

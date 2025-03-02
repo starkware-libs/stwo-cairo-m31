@@ -22,13 +22,13 @@ pub const N_TRACE_CELLS: usize = 7;
 /// jmp_rel_imm = K + 2
 /// `
 // TODO: organize opcodes so that K will work as detailed above, instead of just 0.
-pub const INSTRUCTION_BASE: M31 = M31::from_u32_unchecked(0);
+pub const ADD_AP_JMP_INSTRUCTION_BASE: u32 = 1 << 29;
 
 pub type Component = FrameworkComponent<Eval>;
 
 pub struct Eval {
     pub claim: Claim,
-    pub memory_lookup: MemoryRelation,
+    pub memory_relation_elemnts: MemoryRelation,
     pub state_lookup: StateRelation,
 }
 
@@ -53,7 +53,7 @@ impl FrameworkEval for Eval {
 
         // Check instruction.
         let opcode = decode_opcode(
-            INSTRUCTION_BASE.into(),
+            M31(ADD_AP_JMP_INSTRUCTION_BASE).into(),
             &[
                 (opcode_type.clone(), 3), // [addap, jmp_abs, jmp_rel]
             ],
@@ -62,7 +62,7 @@ impl FrameworkEval for Eval {
         let imm = eval.next_trace_mask();
 
         eval.add_to_relation(RelationEntry::new(
-            &self.memory_lookup,
+            &self.memory_relation_elemnts,
             E::EF::one(),
             &[pc.clone(), opcode.clone()],
         ));
@@ -106,7 +106,8 @@ pub struct Claim {
 impl Claim {
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
         let trace_log_sizes = vec![self.log_size; N_TRACE_CELLS];
-        let interaction_log_sizes = vec![self.log_size; SECURE_EXTENSION_DEGREE * 3];
+        let interaction_log_sizes =
+            vec![self.log_size; SECURE_EXTENSION_DEGREE * 3_usize.div_ceil(2)];
         TreeVec::new(vec![vec![], trace_log_sizes, interaction_log_sizes])
     }
 
