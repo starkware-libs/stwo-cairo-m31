@@ -48,9 +48,7 @@ pub fn prove_cairo(input: CairoInput) -> Result<CairoProof, ProvingError> {
 
     let mut tree_builder = commitment_scheme.tree_builder();
     let witness_gen = CairoWitnessGen::new(input);
-
     let (claim, interaction_generator) = witness_gen.write_trace(&mut tree_builder);
-
     claim.mix_into(channel);
     tree_builder.commit(channel);
 
@@ -96,16 +94,14 @@ pub fn verify_cairo(
     let commitment_scheme_verifier =
         &mut CommitmentSchemeVerifier::<Blake2sMerkleChannel>::new(config);
 
-    claim.mix_into(channel);
     commitment_scheme_verifier.commit(stark_proof.commitments[0], &claim.log_sizes()[0], channel);
+    claim.mix_into(channel);
+    commitment_scheme_verifier.commit(stark_proof.commitments[1], &claim.log_sizes()[1], channel);
     let interaction_elements = CairoRelations::draw(channel);
     if !lookup_sum_valid(&claim, &interaction_elements, &interaction_claim) {
         return Err(CairoVerificationError::InvalidLogupSum);
     }
     interaction_claim.mix_into(channel);
-    commitment_scheme_verifier.commit(stark_proof.commitments[1], &claim.log_sizes()[1], channel);
-
-    // Fixed trace.
     commitment_scheme_verifier.commit(stark_proof.commitments[2], &claim.log_sizes()[2], channel);
 
     let component_generator =
@@ -131,7 +127,7 @@ pub enum CairoVerificationError {
 
 #[cfg(test)]
 mod tests {
-    use super::prove_cairo;
+    use super::{prove_cairo, verify_cairo};
     use crate::input::instructions::{Instructions, VmState};
     use crate::input::mem::{MemConfig, MemoryBuilder};
     use crate::input::vm_import::MemEntry;
@@ -164,6 +160,7 @@ mod tests {
             public_mem_addresses,
         };
 
-        prove_cairo(input).unwrap();
+        let proof = prove_cairo(input).unwrap();
+        verify_cairo(proof).unwrap();
     }
 }

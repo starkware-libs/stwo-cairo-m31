@@ -75,9 +75,9 @@ pub struct Claim {
 }
 impl Claim {
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
-        let interaction_0_log_size = vec![self.log_size; N_COLUMNS];
-        let interaction_1_log_size = vec![self.log_size; SECURE_EXTENSION_DEGREE];
-        TreeVec::new(vec![vec![], interaction_0_log_size, interaction_1_log_size])
+        let trace = vec![self.log_size; N_COLUMNS];
+        let interaction_trace = vec![self.log_size; SECURE_EXTENSION_DEGREE];
+        TreeVec::new(vec![vec![], trace, interaction_trace])
     }
 
     pub fn mix_into(&self, channel: &mut impl Channel) {
