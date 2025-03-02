@@ -79,25 +79,26 @@ impl ClaimGenerator {
                     .into_packed_m31s();
                 *lookup_data.memory[0] = [input.pc, opcode, off0, off1, imm];
 
-                let [op_type, lhs_flag, rhs_flag, appp] =
-                    decode_opcode(INSTRUCTION_BASE, opcode, [2, 2, 2, 2]);
+                let [op_type, lhs_flag, rhs_flag, complex_flag, appp] =
+                    decode_opcode(INSTRUCTION_BASE, opcode, [2, 2, 2, 3, 2]);
 
                 *row[4] = op_type;
                 *row[5] = lhs_flag;
                 *row[6] = rhs_flag;
-                *row[7] = appp;
+                *row[7] = complex_flag;
+                *row[8] = appp;
 
                 // Offsets
-                *row[8] = off0;
-                *row[9] = off1;
-                *row[10] = imm;
+                *row[9] = off0;
+                *row[10] = off1;
+                *row[11] = imm;
 
                 // Addresses
                 let lhs_addr = Selector::select(&lhs_flag, [&input.ap, &input.fp]) + off0;
                 let rhs_addr = Selector::select(&rhs_flag, [&input.ap, &input.fp]) + off1;
 
-                *row[11] = lhs_addr;
-                *row[12] = rhs_addr;
+                *row[12] = lhs_addr;
+                *row[13] = rhs_addr;
 
                 // Values
                 let [lhs0, lhs1, lhs2, lhs3] = memory_trace_generator
@@ -107,15 +108,15 @@ impl ClaimGenerator {
                     .deduce_output(rhs_addr)
                     .into_packed_m31s();
 
-                *row[13] = lhs0;
-                *row[14] = lhs1;
-                *row[15] = lhs2;
-                *row[16] = lhs3;
+                *row[14] = lhs0;
+                *row[15] = lhs1;
+                *row[16] = lhs2;
+                *row[17] = lhs3;
 
-                *row[17] = rhs0;
-                *row[18] = rhs1;
-                *row[19] = rhs2;
-                *row[20] = rhs3;
+                *row[18] = rhs0;
+                *row[19] = rhs1;
+                *row[20] = rhs2;
+                *row[21] = rhs3;
 
                 *lookup_data.memory[1] = [lhs_addr, lhs0, lhs1, lhs2, lhs3];
                 *lookup_data.memory[2] = [rhs_addr, rhs0, rhs1, rhs2, rhs3];

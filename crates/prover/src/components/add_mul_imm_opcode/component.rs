@@ -1,5 +1,5 @@
 use itertools::{chain, Itertools};
-use num_traits::One;
+use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 use stwo_prover::constraint_framework::{
     EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
@@ -11,10 +11,10 @@ use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
 use stwo_prover::core::pcs::TreeVec;
 
 use crate::relations::{MemoryRelation, StateRelation};
-use crate::utils::component::{decode_opcode, is_bit};
+use crate::utils::component::{decode_opcode, is_bit, is_trit};
 use crate::utils::{Selector, SelectorTrait};
 
-pub const N_TRACE_COLUMNS: usize = 21;
+pub const N_TRACE_COLUMNS: usize = 22;
 // TODO(alont): set instruction bases to not overlap
 pub const INSTRUCTION_BASE: M31 = M31::from_u32_unchecked(0);
 
@@ -60,10 +60,12 @@ impl FrameworkEval for Eval {
         let [pc, ap, fp] = state;
 
         // Assert flags are in range.
-        let [op_type, lhs_flag, rhs_flag, appp] = std::array::from_fn(|_| eval.next_trace_mask());
+        let [op_type, lhs_flag, rhs_flag, complex_flag, appp] =
+            std::array::from_fn(|_| eval.next_trace_mask());
         eval.add_constraint(is_bit::<E>(&op_type));
         eval.add_constraint(is_bit::<E>(&lhs_flag));
         eval.add_constraint(is_bit::<E>(&rhs_flag));
+        eval.add_constraint(is_trit::<E>(&complex_flag));
         eval.add_constraint(is_bit::<E>(&appp));
 
         // Check instruction.
@@ -71,10 +73,11 @@ impl FrameworkEval for Eval {
         let opcode = decode_opcode(
             INSTRUCTION_BASE.into(),
             &[
-                (op_type.clone(), 2),  // [add, mul]
-                (lhs_flag.clone(), 2), // [ap, fp]
-                (rhs_flag.clone(), 2), // [ap, fp]
-                (appp.clone(), 2),     // [false, true]
+                (op_type.clone(), 2),      // [add, mul]
+                (lhs_flag.clone(), 2),     // [ap, fp]
+                (rhs_flag.clone(), 2),     // [ap, fp]
+                (complex_flag.clone(), 3), // [1, i, u]
+                (appp.clone(), 2),         // [false, true]
             ],
         );
 
@@ -118,6 +121,15 @@ impl FrameworkEval for Eval {
 
         let lhs_val = E::combine_ef(lhs_val_arr);
         let rhs_val = E::combine_ef(rhs_val_arr);
+
+        let imm = Selector::select(
+            &(E::EF::from(complex_flag)),
+            [
+                &E::combine_ef([imm.clone(), E::F::zero(), E::F::zero(), E::F::zero()]),
+                &E::combine_ef([E::F::zero(), imm.clone(), E::F::zero(), E::F::zero()]),
+                &E::combine_ef([E::F::zero(), E::F::zero(), imm.clone(), E::F::zero()]),
+            ],
+        );
 
         // Apply operation.
         eval.add_constraint(
