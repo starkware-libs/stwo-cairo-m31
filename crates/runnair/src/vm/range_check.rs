@@ -9,8 +9,13 @@ use crate::vm::{resolve_addresses, InstructionArgs, State};
 
 fn resolve_range_check_arg(memory: &Memory, state: State, base: &str, offset: M31) -> QM31 {
     let [checked_addr] = resolve_addresses(state, &[base], &[offset]);
-    let Some(MaybeRelocatable::Absolute(checked_value)) = memory.get(checked_addr) else {
-        panic!("Range checked value must be an absolute value.")
+    let opt_val =  memory.get(checked_addr);
+  
+    let Some(MaybeRelocatable::Absolute(checked_value)) = opt_val else {
+          panic!(
+            "Condition must be an absolute value. Got: {:?} at {:?}",
+            opt_val, checked_addr
+        )
     };
     checked_value
 }
@@ -20,7 +25,7 @@ fn range_check(state: State, value: QM31, lower: M31, upper: M31) -> State {
     assert_eq!(value.1 .1, M31::zero());
     assert_eq!(value.0 .1, M31::zero());
     assert!(value.0 .0 >= lower);
-    assert!(value.0 .0 >= upper);
+    assert!(value.0 .0 <= upper);
     state.advance()
 }
 
