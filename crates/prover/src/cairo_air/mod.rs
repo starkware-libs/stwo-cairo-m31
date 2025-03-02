@@ -1,171 +1,31 @@
-pub mod preprocessed;
-use itertools::{chain, Itertools};
-use num_traits::Zero;
-use serde::{Deserialize, Serialize};
-use stwo_prover::constraint_framework::{Relation, TraceLocationAllocator};
-use stwo_prover::core::air::{Component, ComponentProver};
-use stwo_prover::core::backend::simd::SimdBackend;
-use stwo_prover::core::channel::{Blake2sChannel, Channel};
-use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fields::qm31::{SecureField, QM31};
-use stwo_prover::core::fields::FieldExpOps;
-use stwo_prover::core::pcs::{
-    CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig, TreeVec,
+use constraints::{
+    lookup_sum_valid, CairoClaim, CairoComponents, CairoInteractionClaim, CairoRelations,
 };
+use serde::{Deserialize, Serialize};
+use stwo_prover::core::backend::simd::SimdBackend;
+use stwo_prover::core::channel::Blake2sChannel;
+use stwo_prover::core::pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig};
 use stwo_prover::core::poly::circle::{CanonicCoset, PolyOps};
 use stwo_prover::core::prover::{prove, verify, ProvingError, StarkProof, VerificationError};
 use stwo_prover::core::vcs::blake2_merkle::{Blake2sMerkleChannel, Blake2sMerkleHasher};
-use stwo_prover::core::vcs::ops::MerkleHasher;
 use thiserror::Error;
 use tracing::{span, Level};
+use witness::CairoWitnessGen;
 
-use crate::components::memory::component::{Claim, InteractionClaim};
-use crate::components::memory::{ClaimGenerator, Component as MemoryComponent, Eval};
-use crate::input::instructions::VmState;
 use crate::input::CairoInput;
-use crate::relations::MemoryRelation;
+
+mod constraints;
+mod witness;
 
 #[derive(Serialize, Deserialize)]
-pub struct CairoProof<H: MerkleHasher> {
+pub struct CairoProof {
     pub claim: CairoClaim,
     pub interaction_claim: CairoInteractionClaim,
-    pub stark_proof: StarkProof<H>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct CairoClaim {
-    // Common claim values.
-    pub public_memory: Vec<(M31, QM31)>,
-    pub initial_state: VmState,
-    pub final_state: VmState,
-
-    pub addr_to_value: Claim,
-    // pub ret: Vec<ret_opcode::Claim>,
-    // ...
-}
-
-impl CairoClaim {
-    pub fn mix_into(&self, channel: &mut impl Channel) {
-        // TODO(spapini): Add common values.
-        // self.ret.iter().for_each(|c| c.mix_into(channel));
-        self.addr_to_value.mix_into(channel);
-    }
-
-    pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
-        TreeVec::concat_cols(chain!(
-            // self.ret.iter().map(|c| c.log_sizes()),
-            [self.addr_to_value.log_sizes()],
-        ))
-    }
-}
-
-pub struct CairoInteractionElements {
-    pub addr_to_value_lookup: MemoryRelation,
-    // ...
-}
-impl CairoInteractionElements {
-    pub fn draw(channel: &mut impl Channel) -> CairoInteractionElements {
-        CairoInteractionElements {
-            addr_to_value_lookup: MemoryRelation::draw(channel),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct CairoInteractionClaim {
-    pub addr_to_value: InteractionClaim,
-    // pub ret: Vec<ret_opcode::InteractionClaim>,
-    // ...
-}
-
-impl CairoInteractionClaim {
-    pub fn mix_into(&self, channel: &mut impl Channel) {
-        // self.ret.iter().for_each(|c| c.mix_into(channel));
-        self.addr_to_value.mix_into(channel);
-    }
-}
-
-pub fn lookup_sum_valid(
-    claim: &CairoClaim,
-    elements: &CairoInteractionElements,
-    interaction_claim: &CairoInteractionClaim,
-) -> bool {
-    let mut sum = QM31::zero();
-    // Public memory.
-    // TODO(spapini): Optimized inverse.
-    sum += claim
-        .public_memory
-        .iter()
-        .map(|(addr, val)| {
-            let denom: SecureField = elements
-                .addr_to_value_lookup
-                .combine(&[[*addr].as_slice(), val.to_m31_array().as_slice()].concat());
-            denom.inverse()
-        })
-        .sum::<SecureField>();
-    // TODO: include initial and final state.
-    // sum += interaction_claim.ret[0].logup_sums.1.unwrap().0;
-    sum += interaction_claim.addr_to_value.claimed_sum;
-    sum == SecureField::zero()
-}
-
-pub struct CairoComponents {
-    addr_to_value: MemoryComponent,
-    // ret: Vec<ret_opcode::Component>,
-    // ...
-}
-
-impl CairoComponents {
-    pub fn new(
-        cairo_claim: &CairoClaim,
-        interaction_elements: &CairoInteractionElements,
-        interaction_claim: &CairoInteractionClaim,
-    ) -> Self {
-        let tree_span_provider = &mut TraceLocationAllocator::default();
-
-        // let ret_components = cairo_claim
-        //     .ret
-        //     .iter()
-        //     .zip(interaction_claim.ret.iter())
-        //     .map(|(claim, interaction_claim)| {
-        //         ret_opcode::Component::new(
-        //             tree_span_provider,
-        //             ret_opcode::Eval {
-        //                 claim: claim.clone(),
-        //                 memory_lookup: interaction_elements.addr_to_value_lookup.clone(),
-        //                 state_lookup: interaction_claim.addr_to_value.clone(),
-        //             },
-        //             interaction_claim.logup_sums,
-        //         )
-        //     })
-        //     .collect_vec();
-
-        let addr_to_value_component = MemoryComponent::new(
-            tree_span_provider,
-            Eval::new(
-                cairo_claim.addr_to_value.clone(),
-                interaction_elements.addr_to_value_lookup.clone(),
-                interaction_claim.addr_to_value.clone(),
-            ),
-            interaction_claim.addr_to_value.clone().claimed_sum,
-        );
-        Self {
-            // ret: ret_components,
-            addr_to_value: addr_to_value_component,
-        }
-    }
-
-    pub fn provers(&self) -> Vec<&dyn ComponentProver<SimdBackend>> {
-        vec![&self.addr_to_value]
-    }
-
-    pub fn components(&self) -> Vec<&dyn Component> {
-        vec![&self.addr_to_value]
-    }
+    pub stark_proof: StarkProof<Blake2sMerkleHasher>,
 }
 
 const LOG_MAX_ROWS: u32 = 20;
-pub fn prove_cairo(input: CairoInput) -> Result<CairoProof<Blake2sMerkleHasher>, ProvingError> {
+pub fn prove_cairo(input: CairoInput) -> Result<CairoProof, ProvingError> {
     let _span = span!(Level::INFO, "prove_cairo").entered();
     let config = PcsConfig::default();
     let twiddles = SimdBackend::precompute_twiddles(
@@ -178,63 +38,21 @@ pub fn prove_cairo(input: CairoInput) -> Result<CairoProof<Blake2sMerkleHasher>,
     let channel = &mut Blake2sChannel::default();
     let mut commitment_scheme = CommitmentSchemeProver::new(config, &twiddles);
 
-    // Extract public memory.
-    let public_memory = input
-        .public_mem_addresses
-        .iter()
-        .copied()
-        .map(|a| (M31::from(a), input.mem.get(a).0))
-        .collect_vec();
-
-    // TODO: Table interaction.
-
-    // Base trace.
-    // TODO(Ohad): change to OpcodeClaimProvers, and integrate padding.
-    // let ret_trace_generator = ret_opcode::ClaimGenerator::new(input.instructions.ret);
-    let mut addr_to_value_trace_generator = ClaimGenerator::new(&input.mem);
-
-    // Add public memory.
-    // TODO(ShaharS): fix the use of public memory to support memory ids.
-    for addr in &input.public_mem_addresses {
-        addr_to_value_trace_generator.add_inputs(*addr as usize);
-    }
-
     let mut tree_builder = commitment_scheme.tree_builder();
+    let witness_gen = CairoWitnessGen::new(input);
 
-    // let (ret_claim, ret_interaction_prover) =
-    //     ret_trace_generator.write_trace(&mut tree_builder, &mut addr_to_value_trace_generator);
-    let (addr_to_value_claim, addr_to_value_interaction_prover) =
-        addr_to_value_trace_generator.write_trace(&mut tree_builder);
-    // Commit to the claim and the trace.
-    let claim = CairoClaim {
-        public_memory,
-        initial_state: input.instructions.initial_state,
-        final_state: input.instructions.final_state,
-        // ret: vec![ret_claim],
-        addr_to_value: addr_to_value_claim.clone(),
-    };
+    let (claim, interaction_generator) = witness_gen.write_trace(&mut tree_builder);
+
     claim.mix_into(channel);
     tree_builder.commit(channel);
 
     // Draw interaction elements.
-    let interaction_elements = CairoInteractionElements::draw(channel);
+    let interaction_elements = CairoRelations::draw(channel);
 
     // Interaction trace.
     let mut tree_builder = commitment_scheme.tree_builder();
-    // let ret_interaction_claim = ret_interaction_prover.write_interaction_trace(
-    //     &mut tree_builder,
-    //     &interaction_elements.addr_to_value_lookup,
-    // );
-    let addr_to_value_interaction_claim = addr_to_value_interaction_prover.write_interaction_trace(
-        &mut tree_builder,
-        &interaction_elements.addr_to_value_lookup,
-    );
-
-    // Commit to the interaction claim and the interaction trace.
-    let interaction_claim = CairoInteractionClaim {
-        // ret: vec![ret_interaction_claim.clone()],
-        addr_to_value: addr_to_value_interaction_claim.clone(),
-    };
+    let interaction_claim =
+        interaction_generator.write_interaction_trace(&mut tree_builder, &interaction_elements);
     debug_assert!(lookup_sum_valid(
         &claim,
         &interaction_elements,
@@ -243,17 +61,17 @@ pub fn prove_cairo(input: CairoInput) -> Result<CairoProof<Blake2sMerkleHasher>,
     interaction_claim.mix_into(channel);
     tree_builder.commit(channel);
 
-    // Component provers.
+    // Constraint evaluators.
     let component_builder = CairoComponents::new(&claim, &interaction_elements, &interaction_claim);
     let components = component_builder.provers();
 
-    // Prove stark.
-    let proof = prove::<SimdBackend, _>(&components, channel, commitment_scheme)?;
+    // STARKs.
+    let stark_proof = prove::<SimdBackend, _>(&components, channel, commitment_scheme)?;
 
     Ok(CairoProof {
         claim,
         interaction_claim,
-        stark_proof: proof,
+        stark_proof,
     })
 }
 
@@ -262,7 +80,7 @@ pub fn verify_cairo(
         claim,
         interaction_claim,
         stark_proof,
-    }: CairoProof<Blake2sMerkleHasher>,
+    }: CairoProof,
 ) -> Result<(), CairoVerificationError> {
     // Verify.
     let config = PcsConfig::default();
@@ -272,7 +90,7 @@ pub fn verify_cairo(
 
     claim.mix_into(channel);
     commitment_scheme_verifier.commit(stark_proof.commitments[0], &claim.log_sizes()[0], channel);
-    let interaction_elements = CairoInteractionElements::draw(channel);
+    let interaction_elements = CairoRelations::draw(channel);
     if !lookup_sum_valid(&claim, &interaction_elements, &interaction_claim) {
         return Err(CairoVerificationError::InvalidLogupSum);
     }
