@@ -14,7 +14,7 @@ use crate::relations::{MemoryRelation, StateRelation};
 use crate::utils::component::{decode_opcode, is_bit};
 use crate::utils::{Selector, SelectorTrait};
 
-pub const N_TRACE_COLUMNS: usize = 20;
+pub const N_TRACE_COLUMNS: usize = 21;
 // TODO(alont): set instruction bases to not overlap
 pub const INSTRUCTION_BASE: M31 = M31::from_u32_unchecked(0);
 
@@ -47,9 +47,16 @@ impl FrameworkEval for Eval {
     }
 
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
+        let mult = eval.next_trace_mask();
+        eval.add_constraint(is_bit::<E>(&mult));
+
         let state = std::array::from_fn(|_| eval.next_trace_mask());
         // Use initial state.
-        eval.add_to_relation(RelationEntry::new(&self.state_lookup, E::EF::one(), &state));
+        eval.add_to_relation(RelationEntry::new(
+            &self.state_lookup,
+            mult.clone().into(),
+            &state,
+        ));
         let [pc, ap, fp] = state;
 
         // Assert flags are in range.
@@ -128,7 +135,7 @@ impl FrameworkEval for Eval {
         let new_state = [pc + E::F::one(), ap + appp, fp];
         eval.add_to_relation(RelationEntry::new(
             &self.state_lookup,
-            -E::EF::one(),
+            -E::EF::one() * mult,
             &new_state,
         ));
 
