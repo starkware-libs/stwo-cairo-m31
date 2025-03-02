@@ -7,13 +7,13 @@ use stwo_prover::core::fields::qm31::QM31;
 
 pub(crate) type Segment = usize;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Relocatable {
     pub segment: Segment,
     pub offset: M31,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum MaybeRelocatable<T: From<M31>> {
     Relocatable(Relocatable),
     Absolute(T),

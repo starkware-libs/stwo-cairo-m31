@@ -84,3 +84,23 @@ pub(crate) fn double_deref_fp(
     let address = assert_and_project(memory[state.fp + args[0]] + args[1]);
     memory[address]
 }
+
+// Range check
+
+pub(crate) fn range_check_ap(
+    memory: &mut Memory,
+    state: State,
+    args: &[M31],
+) -> MaybeRelocatableValue {
+    let offset = args[2];
+    memory[state.ap + offset]
+}
+
+pub(crate) fn range_check_fp(
+    memory: &mut Memory,
+    state: State,
+    args: &[M31],
+) -> MaybeRelocatableValue {
+    let offset = args[2];
+    memory[state.fp + offset]
+}
