@@ -6,14 +6,62 @@
     "compiler_version": "0.13.2",
     "data": [
         [
+            "0x20",
+            "0x2",
+            "0x7ffffffc",
+            "0x0"
+        ],
+        [
+            "0x20",
+            "0x2",
+            "0x7ffffffc",
+            "0x0"
+        ],
+        [
             "0xa",
-            "0x1",
+            "0x2",
             "0x0",
             "0x0"
         ],
         [
-            "0x45",
+            "0x5a",
+            "0x5",
             "0x0",
+            "0x0"
+        ],
+        [
+            "0x26",
+            "0x0",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0x1d",
+            "0x7ffffffe",
+            "0x7ffffffb",
+            "0x0"
+        ],
+        [
+            "0x1e",
+            "0x0",
+            "0x7ffffffd",
+            "0x0"
+        ],
+        [
+            "0xab",
+            "0x0",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0x26",
+            "0x0",
+            "0x1",
+            "0x0"
+        ],
+        [
+            "0x23",
+            "0x7ffffffe",
             "0x7ffffffc",
             "0x0"
         ],
@@ -21,24 +69,6 @@
             "0x26",
             "0x0",
             "0x1",
-            "0x0"
-        ],
-        [
-            "0x26",
-            "0x0",
-            "0x1",
-            "0x0"
-        ],
-        [
-            "0x20",
-            "0x0",
-            "0x0",
-            "0x0"
-        ],
-        [
-            "0x5a",
-            "0x4",
-            "0x0",
             "0x0"
         ],
         [
@@ -48,28 +78,190 @@
             "0x1"
         ],
         [
+            "0x26",
+            "0x0",
+            "0x14",
+            "0x0"
+        ],
+        [
+            "0x20",
+            "0x0",
+            "0x7ffffffb",
+            "0x0"
+        ],
+        [
             "0x1c",
             "0x0",
             "0x2",
             "0x7ffffffc"
         ],
         [
+            "0x5a",
+            "0x2",
+            "0x0",
+            "0x0"
+        ],
+        [
             "0xab",
             "0x0",
             "0x0",
             "0x0"
         ],
         [
-            "0xa9",
+            "0x38",
+            "0x7ffffffc",
+            "0x7ffffffb",
+            "0x0"
+        ],
+        [
+            "0x16",
+            "0x7ffffffe",
+            "0x7ffffffa",
+            "0x0"
+        ],
+        [
+            "0xa8",
             "0x3",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0xac",
+            "0x0",
+            "0xfffffff",
+            "0x7ffffffe"
+        ],
+        [
+            "0x91",
+            "0x6",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0x1a",
+            "0x0",
+            "0x10000000",
+            "0x7ffffffd"
+        ],
+        [
+            "0xac",
+            "0x0",
+            "0xfffffff",
+            "0x1"
+        ],
+        [
+            "0x26",
+            "0x0",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0x1e",
+            "0x0",
+            "0x7ffffffb",
+            "0x0"
+        ],
+        [
+            "0x91",
+            "0x4",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0xa",
+            "0x1",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0x26",
+            "0x0",
+            "0x1",
+            "0x0"
+        ],
+        [
+            "0x1e",
+            "0x0",
+            "0x7ffffffb",
+            "0x0"
+        ],
+        [
+            "0xa7",
+            "0x44",
+            "0x7ffffffd",
+            "0x0"
+        ],
+        [
+            "0x1a",
+            "0x7ffffff9",
+            "0x1",
+            "0x0"
+        ],
+        [
+            "0xa8",
+            "0x3",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0xac",
+            "0x0",
+            "0xfffffff",
+            "0x7ffffffe"
+        ],
+        [
+            "0x91",
+            "0xa",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0x1a",
+            "0x0",
+            "0x10000000",
+            "0x7ffffffd"
+        ],
+        [
+            "0xac",
+            "0x0",
+            "0xfffffff",
+            "0x1"
+        ],
+        [
+            "0xa",
+            "0x1",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0x26",
+            "0x0",
+            "0x737562",
+            "0x0"
+        ],
+        [
+            "0x21",
+            "0x7ffffffe",
+            "0x7ffffffd",
+            "0x0"
+        ],
+        [
+            "0x26",
+            "0x0",
+            "0x1",
+            "0x0"
+        ],
+        [
+            "0x1e",
+            "0x0",
             "0x7ffffffc",
             "0x0"
         ],
         [
-            "0x20",
+            "0x1a",
             "0x0",
-            "0x7ffffffb",
-            "0x0"
+            "0x1",
+            "0x7ffffffb"
         ],
         [
             "0xab",
@@ -78,38 +270,350 @@
             "0x0"
         ],
         [
-            "0x2e",
-            "0x0",
-            "0x7ffffffa",
-            "0x7ffffffa"
+            "0x38",
+            "0x7ffffffc",
+            "0x7ffffffb",
+            "0x0"
         ],
         [
-            "0x2e",
+            "0xa8",
+            "0x4",
             "0x0",
+            "0x0"
+        ],
+        [
+            "0x12",
             "0x7ffffffb",
+            "0x7ffffffd",
+            "0x0"
+        ],
+        [
+            "0xac",
+            "0x0",
+            "0xfffffff",
+            "0x2"
+        ],
+        [
+            "0x91",
+            "0x2b",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0x1a",
+            "0x0",
+            "0x1",
             "0x7ffffffb"
         ],
         [
-            "0x20",
+            "0x12",
+            "0x7ffffffc",
+            "0x7ffffffe",
+            "0x0"
+        ],
+        [
+            "0xac",
             "0x0",
+            "0xfffffff",
+            "0x3"
+        ],
+        [
+            "0x14",
+            "0x0",
+            "0x7ffffff9",
+            "0x7ffffffb"
+        ],
+        [
+            "0x1a",
+            "0x7ffffff2",
+            "0x2",
+            "0x0"
+        ],
+        [
+            "0x22",
+            "0x0",
+            "0x7ffffffd",
+            "0x0"
+        ],
+        [
+            "0xa8",
+            "0x3",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0xac",
+            "0x0",
+            "0xfffffff",
+            "0x7ffffffd"
+        ],
+        [
+            "0x91",
+            "0xa",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0x1a",
+            "0x0",
+            "0x10000000",
+            "0x7ffffffc"
+        ],
+        [
+            "0xac",
+            "0x0",
+            "0xfffffff",
+            "0x1"
+        ],
+        [
+            "0xa",
+            "0x1",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0x26",
+            "0x0",
+            "0x737562",
+            "0x0"
+        ],
+        [
+            "0x21",
+            "0x7ffffffe",
+            "0x7ffffffd",
+            "0x0"
+        ],
+        [
+            "0x26",
+            "0x0",
+            "0x1",
+            "0x0"
+        ],
+        [
+            "0x1e",
+            "0x0",
+            "0x7ffffffc",
+            "0x0"
+        ],
+        [
+            "0x1a",
+            "0x0",
+            "0x1",
+            "0x7ffffffb"
+        ],
+        [
+            "0xab",
+            "0x0",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0x38",
+            "0x7ffffffc",
             "0x7ffffffb",
+            "0x0"
+        ],
+        [
+            "0xa8",
+            "0x4",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0x12",
+            "0x7ffffffa",
+            "0x7ffffffd",
+            "0x0"
+        ],
+        [
+            "0xac",
+            "0x0",
+            "0xfffffff",
+            "0x2"
+        ],
+        [
+            "0x91",
+            "0xd",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0x1a",
+            "0x0",
+            "0x1",
+            "0x7ffffffa"
+        ],
+        [
+            "0x12",
+            "0x7ffffffc",
+            "0x7ffffffe",
+            "0x0"
+        ],
+        [
+            "0xac",
+            "0x0",
+            "0xfffffff",
+            "0x3"
+        ],
+        [
+            "0x14",
+            "0x0",
+            "0x7ffffff8",
+            "0x7ffffffb"
+        ],
+        [
+            "0x22",
+            "0x0",
+            "0x7ffffffe",
             "0x0"
         ],
         [
             "0x12",
             "0x0",
+            "0x7ffffffe",
+            "0x7ffffff7"
+        ],
+        [
+            "0x23",
+            "0x7ffffffe",
             "0x7ffffffc",
-            "0x7ffffffd"
+            "0x0"
+        ],
+        [
+            "0x20",
+            "0x0",
+            "0x7ffffffa",
+            "0x0"
+        ],
+        [
+            "0x20",
+            "0x0",
+            "0x7ffffffb",
+            "0x0"
         ],
         [
             "0x1c",
             "0x0",
-            "0x7ffffffe",
+            "0x1",
             "0x7ffffffc"
         ],
         [
             "0x5a",
-            "0x7ffffff7",
+            "0x7fffffbe",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0xab",
+            "0x0",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0xa",
+            "0x1",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0x26",
+            "0x0",
+            "0x757270",
+            "0x0"
+        ],
+        [
+            "0x21",
+            "0x7ffffffe",
+            "0x7ffffffd",
+            "0x0"
+        ],
+        [
+            "0x26",
+            "0x0",
+            "0x1",
+            "0x0"
+        ],
+        [
+            "0x1e",
+            "0x0",
+            "0x7ffffffc",
+            "0x0"
+        ],
+        [
+            "0x1a",
+            "0x0",
+            "0x1",
+            "0x7ffffffb"
+        ],
+        [
+            "0xab",
+            "0x0",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0xa",
+            "0x1",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0x26",
+            "0x0",
+            "0x757270",
+            "0x0"
+        ],
+        [
+            "0x21",
+            "0x7ffffffe",
+            "0x7ffffffd",
+            "0x0"
+        ],
+        [
+            "0x26",
+            "0x0",
+            "0x1",
+            "0x0"
+        ],
+        [
+            "0x1e",
+            "0x0",
+            "0x7ffffffc",
+            "0x0"
+        ],
+        [
+            "0x1a",
+            "0x0",
+            "0x1",
+            "0x7ffffffb"
+        ],
+        [
+            "0xab",
+            "0x0",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0x26",
+            "0x0",
+            "0x0",
+            "0x0"
+        ],
+        [
+            "0x20",
+            "0x0",
+            "0x7ffffffb",
+            "0x0"
+        ],
+        [
+            "0x20",
+            "0x0",
+            "0x7ffffffc",
+            "0x0"
+        ],
+        [
+            "0xab",
+            "0x0",
             "0x0",
             "0x0"
         ],
@@ -692,25 +1196,306 @@
         }
     },
     "hints": {
-        "1": [
-            {
-                "accessible_scopes": [
-                    "__main__",
-                    "__main__.main"
-                ],
-                "code": "memory[state.fp] = input['fibonacci_claim_index'];",
-                "flow_tracking_data": {
-                    "ap_tracking": {
-                        "group": 0,
-                        "offset": 1
+       "0": [
+        {
+            "accessible_scopes": [],
+            "code": {
+                "WriteRunParam": {
+                    "dst": {
+                        "offset": 0,
+                        "register": "AP"
                     },
-                    "reference_ids": {
-                        "__main__.main.fibonacci_claim_index": 1,
-                        "__main__.main.output_ptr": 0
+                    "index": {
+                        "Immediate": "0x0"
                     }
                 }
+            },
+            "flow_tracking_data": {
+                "ap_tracking": {
+                    "group": 0,
+                    "offset": 1
+                },
+                "reference_ids": {}
             }
-        ]
+        }
+    ],
+    "5": [
+        {
+            "accessible_scopes": [],
+            "code": {
+                "AddMarker": {
+                    "end": {
+                        "Deref": {
+                            "offset": -2,
+                            "register": "AP"
+                        }
+                    },
+                    "start": {
+                        "Deref": {
+                            "offset": -3,
+                            "register": "AP"
+                        }
+                    }
+                }
+            },
+            "flow_tracking_data": {
+                "ap_tracking": {
+                    "group": 0,
+                    "offset": 1
+                },
+                "reference_ids": {}
+            }
+        }
+    ],
+    "13": [
+        {
+            "accessible_scopes": [],
+            "code": {
+                "TestLessThanOrEqual": {
+                    "dst": {
+                        "offset": 0,
+                        "register": "AP"
+                    },
+                    "lhs": {
+                        "Immediate": "0x10000000"
+                    },
+                    "rhs": {
+                        "BinOp": {
+                            "a": {
+                                "offset": -1,
+                                "register": "AP"
+                            },
+                            "b": {
+                                "Immediate": "0x0"
+                            },
+                            "op": "Add"
+                        }
+                    }
+                }
+            },
+            "flow_tracking_data": {
+                "ap_tracking": {
+                    "group": 0,
+                    "offset": 1
+                },
+                "reference_ids": {}
+            }
+        }
+    ],
+    "20": [
+        {
+            "accessible_scopes": [],
+            "code": {
+                "TestLessThanOrEqual": {
+                    "dst": {
+                        "offset": 0,
+                        "register": "AP"
+                    },
+                    "lhs": {
+                        "Immediate": "0x10000000"
+                    },
+                    "rhs": {
+                        "BinOp": {
+                            "a": {
+                                "offset": -1,
+                                "register": "AP"
+                            },
+                            "b": {
+                                "Immediate": "0x0"
+                            },
+                            "op": "Add"
+                        }
+                    }
+                }
+            },
+            "flow_tracking_data": {
+                "ap_tracking": {
+                    "group": 0,
+                    "offset": 1
+                },
+                "reference_ids": {}
+            }
+        }
+    ],
+    "25": [
+        {
+            "accessible_scopes": [],
+            "code": {
+                "AllocSegment": {
+                    "dst": {
+                        "offset": 0,
+                        "register": "AP"
+                    }
+                }
+            },
+            "flow_tracking_data": {
+                "ap_tracking": {
+                    "group": 0,
+                    "offset": 1
+                },
+                "reference_ids": {}
+            }
+        }
+    ],
+    "2d": [
+        {
+            "accessible_scopes": [],
+            "code": {
+                "TestLessThan": {
+                    "dst": {
+                        "offset": 0,
+                        "register": "AP"
+                    },
+                    "lhs": {
+                        "Deref": {
+                            "offset": -3,
+                            "register": "AP"
+                        }
+                    },
+                    "rhs": {
+                        "Deref": {
+                            "offset": -1,
+                            "register": "AP"
+                        }
+                    }
+                }
+            },
+            "flow_tracking_data": {
+                "ap_tracking": {
+                    "group": 0,
+                    "offset": 1
+                },
+                "reference_ids": {}
+            }
+        }
+    ],
+    "37": [
+        {
+            "accessible_scopes": [],
+            "code": {
+                "TestLessThanOrEqual": {
+                    "dst": {
+                        "offset": 0,
+                        "register": "AP"
+                    },
+                    "lhs": {
+                        "Immediate": "0x10000000"
+                    },
+                    "rhs": {
+                        "BinOp": {
+                            "a": {
+                                "offset": -2,
+                                "register": "AP"
+                            },
+                            "b": {
+                                "Immediate": "0x0"
+                            },
+                            "op": "Add"
+                        }
+                    }
+                }
+            },
+            "flow_tracking_data": {
+                "ap_tracking": {
+                    "group": 0,
+                    "offset": 1
+                },
+                "reference_ids": {}
+            }
+        }
+    ],
+    "3c": [
+        {
+            "accessible_scopes": [],
+            "code": {
+                "AllocSegment": {
+                    "dst": {
+                        "offset": 0,
+                        "register": "AP"
+                    }
+                }
+            },
+            "flow_tracking_data": {
+                "ap_tracking": {
+                    "group": 0,
+                    "offset": 1
+                },
+                "reference_ids": {}
+            }
+        }
+    ],
+    "44": [
+        {
+            "accessible_scopes": [],
+            "code": {
+                "TestLessThan": {
+                    "dst": {
+                        "offset": 0,
+                        "register": "AP"
+                    },
+                    "lhs": {
+                        "Deref": {
+                            "offset": -4,
+                            "register": "AP"
+                        }
+                    },
+                    "rhs": {
+                        "Deref": {
+                            "offset": -1,
+                            "register": "AP"
+                        }
+                    }
+                }
+            },
+            "flow_tracking_data": {
+                "ap_tracking": {
+                    "group": 0,
+                    "offset": 1
+                },
+                "reference_ids": {}
+            }
+        }
+    ],
+    "54": [
+        {
+            "accessible_scopes": [],
+            "code": {
+                "AllocSegment": {
+                    "dst": {
+                        "offset": 0,
+                        "register": "AP"
+                    }
+                }
+            },
+            "flow_tracking_data": {
+                "ap_tracking": {
+                    "group": 0,
+                    "offset": 1
+                },
+                "reference_ids": {}
+            }
+        }
+    ],
+    "5b": [
+        {
+            "accessible_scopes": [],
+            "code": {
+                "AllocSegment": {
+                    "dst": {
+                        "offset": 0,
+                        "register": "AP"
+                    }
+                }
+            },
+            "flow_tracking_data": {
+                "ap_tracking": {
+                    "group": 0,
+                    "offset": 1
+                },
+                "reference_ids": {}
+            }
+        }
+    ]
     },
     "identifiers": {
         "__main__.fib": {

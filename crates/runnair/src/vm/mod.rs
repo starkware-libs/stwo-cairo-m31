@@ -28,7 +28,7 @@ use crate::memory::{MaybeRelocatableAddr, Memory};
 use crate::utils::{get_tests_data_dir, m31_from_hex_str, maybe_resize, u32_from_usize};
 
 // TODO: reconsider input type and parsing.
-pub(crate) type Input = serde_json::Value;
+pub(crate) type Input = Vec<[u32; 4]>;
 
 #[derive(Clone, Copy, Debug)]
 pub struct State {
@@ -113,8 +113,11 @@ impl TryFrom<ProgramRaw> for Program {
             .filter_map(|(pc, hints_at_pc)| {
                 let pc = usize::from_str_radix(&pc, 16).unwrap();
                 let code = hints_at_pc.as_array()?.first()?.get("code")?;
+                let hint = serde_json::from_value(code.clone())
+                    .unwrap_or_else(|_| panic!("failed to parse hint {}", code));
+
                 // TODO: reconsider this clone.
-                Some((pc, serde_json::from_value(code.clone()).ok()?))
+                Some((pc, hint))
             });
 
         let mut hints = Hints::new();
@@ -462,7 +465,7 @@ pub(crate) fn resolve_addresses<const N: usize>(
 pub(crate) fn run_fibonacci() {
     let program_path = get_tests_data_dir().join("fibonacci_compiled.json");
     let program = Program::from_compiled_file(program_path);
-    let input = serde_json::json!({ "fibonacci_claim_index": ["0x64", "0x0", "0x0", "0x0"]});
+    let input = vec![[0x64, 0x0, 0x0, 0x0]];
     let mut vm = VM::create_for_main_entry_point(program, input);
 
     vm.execute();

@@ -8,7 +8,7 @@ edition = "2021"
 
 [workspace.dependencies]
 bytemuck = { version = "1.16.3", features = ["derive"] }
-cairo-lang-casm = "2.7.1"
+cairo-lang-casm = { version = "2.7.1", features = ["serde"] }
 # TODO(yuval): Use an official version, not a specific commit.
 cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm", rev = "3fb0344c", features = [
     "mod_builtin",
