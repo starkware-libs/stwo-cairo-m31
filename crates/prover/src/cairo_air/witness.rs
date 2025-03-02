@@ -11,12 +11,11 @@ use crate::input::CairoInput;
 pub struct CairoWitnessGen {
     input: CairoInput,
     memory: memory::ClaimGenerator,
-    //
 }
 impl CairoWitnessGen {
     pub fn new(input: CairoInput) -> Self {
         Self {
-            memory: memory::ClaimGenerator::new(&input.memory),
+            memory: memory::ClaimGenerator::new(&input.mem),
             input,
         }
     }
@@ -34,7 +33,7 @@ impl CairoWitnessGen {
             .public_mem_addresses
             .iter()
             .copied()
-            .map(|a| (M31(a), self.input.memory.get(a).0))
+            .map(|a| (M31(a), self.input.mem.get(a).0))
             .collect_vec();
 
         // Add public memory.

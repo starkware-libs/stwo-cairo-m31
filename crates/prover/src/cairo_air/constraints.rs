@@ -12,7 +12,6 @@ use stwo_prover::core::pcs::TreeVec;
 use stwo_prover::core::prover::StarkProof;
 use stwo_prover::core::vcs::ops::MerkleHasher;
 
-use super::preprocessed::PreProcessedTrace;
 use crate::components::memory;
 use crate::input::instructions::VmState;
 use crate::relations::MemoryRelation;
@@ -113,9 +112,24 @@ impl CairoComponents {
         interaction_elements: &CairoRelations,
         interaction_claim: &CairoInteractionClaim,
     ) -> Self {
-        let tree_span_provider = &mut TraceLocationAllocator::new_with_preproccessed_columns(
-            &PreProcessedTrace::new().ids(),
-        );
+        let tree_span_provider = &mut TraceLocationAllocator::default();
+
+        // let ret_components = cairo_claim
+        //     .ret
+        //     .iter()
+        //     .zip(interaction_claim.ret.iter())
+        //     .map(|(claim, interaction_claim)| {
+        //         ret_opcode::Component::new(
+        //             tree_span_provider,
+        //             ret_opcode::Eval {
+        //                 claim: claim.clone(),
+        //                 memory_lookup: interaction_elements.addr_to_value_lookup.clone(),
+        //                 state_lookup: interaction_claim.addr_to_value.clone(),
+        //             },
+        //             interaction_claim.logup_sums,
+        //         )
+        //     })
+        //     .collect_vec();
 
         let addr_to_value_component = memory::Component::new(
             tree_span_provider,
