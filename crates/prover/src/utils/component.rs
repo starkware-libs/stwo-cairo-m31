@@ -1,8 +1,9 @@
 use std::ops::{Add, Mul};
 
 use num_traits::One;
+use stwo_prover::constraint_framework::EvalAtRow;
 use stwo_prover::core::backend::simd::m31::LOG_N_LANES;
-use stwo_prover::core::fields::m31::M31;
+use stwo_prover::core::fields::m31::{BaseField, M31};
 
 /// Decodes an opcode to its base and flags. Returns the opcode.
 /// `flags` is a list of pairs `(flag, n_variants)`, where `flag` is the flag value and
@@ -22,6 +23,23 @@ where
 
 pub fn log_size(num: usize) -> u32 {
     std::cmp::max(num.next_power_of_two().ilog2(), LOG_N_LANES)
+}
+
+/// Create a constraint asserting that `flag` is a bit.
+pub fn is_bit<E: EvalAtRow>(flag: &E::F) -> E::F {
+    let f = || flag.clone();
+    // f^2 - f
+    f() * f() - f()
+}
+
+/// Create a constraint asserting that `flag` is a trit (a digit in {0,1,2}).
+pub fn is_trit<E: EvalAtRow>(flag: &E::F) -> E::F {
+    let two = E::F::from(BaseField::from_u32_unchecked(2));
+    let three = E::F::from(BaseField::from_u32_unchecked(3));
+    let f = || flag.clone();
+
+    // is_trit(f) := (f - 2) * (f - 1) * (f)  ==expands into==>  f^3 - 3*f^2 + 2*f.
+    f() * f() * f() - three * f() * f() + two * f()
 }
 
 #[cfg(test)]

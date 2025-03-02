@@ -11,7 +11,7 @@ use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
 use stwo_prover::core::pcs::TreeVec;
 
 use crate::relations::{MemoryRelation, StateRelation};
-use crate::utils::component::decode_opcode;
+use crate::utils::component::{decode_opcode, is_trit};
 use crate::utils::{Selector, SelectorTrait};
 
 pub const N_TRACE_CELLS: usize = 7;
@@ -50,11 +50,7 @@ impl FrameworkEval for Eval {
 
         // Assert opcode_type is in range: {0,1,2}.
         let opcode_type = eval.next_trace_mask();
-        eval.add_constraint(
-            opcode_type.clone()
-                * (opcode_type.clone() - E::F::one())
-                * (opcode_type.clone() - E::F::from(M31::from_u32_unchecked(2))),
-        );
+        eval.add_constraint(is_trit::<E>(&opcode_type));
 
         // Check instruction.
         let opcode = decode_opcode(
