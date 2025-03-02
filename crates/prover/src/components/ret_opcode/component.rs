@@ -90,11 +90,10 @@ impl Claim {
         let log_size = self.n_rows.next_power_of_two().ilog2();
         let interaction_0_log_sizes = vec![log_size; RET_N_TRACE_CELLS];
         let interaction_1_log_sizes = vec![log_size; SECURE_EXTENSION_DEGREE * 3];
-        let fixed_log_sizes = vec![log_size];
         TreeVec::new(vec![
+            vec![],
             interaction_0_log_sizes,
             interaction_1_log_sizes,
-            fixed_log_sizes,
         ])
     }
 }

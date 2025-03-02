@@ -150,11 +150,10 @@ impl Claim {
 
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
         let log_size = std::cmp::max(self.n_rows.next_power_of_two().ilog2(), LOG_N_LANES);
-        let preprocessed_log_sizes = vec![log_size];
         let interaction_1_log_sizes = vec![log_size; N_TRACE_COLUMNS];
         let interaction_2_log_sizes = vec![log_size; SECURE_EXTENSION_DEGREE * 3];
         TreeVec::new(vec![
-            preprocessed_log_sizes,
+            vec![],
             interaction_1_log_sizes,
             interaction_2_log_sizes,
         ])
