@@ -10,14 +10,12 @@ use stwo_prover::core::backend::simd::qm31::PackedQM31;
 use stwo_prover::core::backend::simd::SimdBackend;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::pcs::TreeBuilder;
-use stwo_prover::core::utils::bit_reverse_coset_to_circle_domain_order;
 use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleChannel;
 
 use super::component::{Claim, InteractionClaim, RET_INSTRUCTION};
 use crate::components::memory;
-use crate::input::instructions::VmState;
 use crate::relations::{MemoryRelation, StateRelation, N_MEMORY_ELEMS, STATE_SIZE};
-use crate::utils::types::PackedCasmState;
+use crate::utils::types::{CasmState, PackedCasmState};
 
 const N_TRACE_COLUMNS: usize = 5;
 
@@ -29,34 +27,22 @@ pub struct ClaimGenerator {
     pub inputs: Vec<PackedCasmState>,
 }
 impl ClaimGenerator {
-    pub fn new(mut inputs: Vec<VmState>) -> Self {
+    pub fn new(mut inputs: Vec<CasmState>) -> Self {
         assert!(!inputs.is_empty());
 
         // TODO(spapini): Split to multiple components.
         let n_rows = inputs.len();
         assert_ne!(n_rows, 0);
         let size = std::cmp::max(n_rows.next_power_of_two(), N_LANES);
-        inputs.resize(size, inputs[0]);
-        let need_padding = n_rows != size;
-
-        if need_padding {
-            inputs.resize(size, *inputs.first().unwrap());
-            bit_reverse_coset_to_circle_domain_order(&mut inputs);
-        }
+        inputs.resize(size, inputs[0].clone());
 
         let inputs = inputs
             .into_iter()
             .array_chunks::<N_LANES>()
             .map(|chunk| PackedCasmState {
-                pc: PackedM31::from_array(std::array::from_fn(|i| {
-                    M31::from_u32_unchecked(chunk[i].pc)
-                })),
-                ap: PackedM31::from_array(std::array::from_fn(|i| {
-                    M31::from_u32_unchecked(chunk[i].ap)
-                })),
-                fp: PackedM31::from_array(std::array::from_fn(|i| {
-                    M31::from_u32_unchecked(chunk[i].fp)
-                })),
+                pc: PackedM31::from_array(std::array::from_fn(|i| chunk[i].pc)),
+                ap: PackedM31::from_array(std::array::from_fn(|i| chunk[i].ap)),
+                fp: PackedM31::from_array(std::array::from_fn(|i| chunk[i].fp)),
             })
             .collect_vec();
 
@@ -79,7 +65,9 @@ impl ClaimGenerator {
         });
         tree_builder.extend_evals(trace.to_evals());
         (
-            Claim { n_rows },
+            Claim {
+                log_size: n_rows.ilog2(),
+            },
             InteractionClaimGenerator {
                 n_rows,
                 lookup_data,

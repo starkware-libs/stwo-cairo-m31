@@ -8,7 +8,6 @@ use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
 use stwo_prover::core::pcs::TreeVec;
 
 use crate::relations::{MemoryRelation, StateRelation};
-use crate::utils::component::log_size;
 
 pub const RET_N_TRACE_CELLS: usize = 5;
 // TODO(alont): set instruction bases to not overlap
@@ -24,7 +23,7 @@ pub struct Eval {
 
 impl Eval {
     pub fn log_size(&self) -> u32 {
-        log_size(self.claim.n_rows)
+        self.claim.log_size
     }
 
     pub fn max_constraint_log_degree_bound(&self) -> u32 {
@@ -79,22 +78,20 @@ impl Eval {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Claim {
-    pub n_rows: usize,
+    pub log_size: u32,
 }
 impl Claim {
     pub fn mix_into(&self, channel: &mut impl Channel) {
-        channel.mix_u64(self.n_rows as u64);
+        channel.mix_u64(self.log_size as u64);
     }
 
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
-        let log_size = self.n_rows.next_power_of_two().ilog2();
-        let interaction_0_log_sizes = vec![log_size; RET_N_TRACE_CELLS];
-        let interaction_1_log_sizes = vec![log_size; SECURE_EXTENSION_DEGREE * 3];
-        let fixed_log_sizes = vec![log_size];
+        let interaction_0_log_sizes = vec![self.log_size; RET_N_TRACE_CELLS];
+        let interaction_1_log_sizes = vec![self.log_size; SECURE_EXTENSION_DEGREE * 3];
         TreeVec::new(vec![
+            vec![],
             interaction_0_log_sizes,
             interaction_1_log_sizes,
-            fixed_log_sizes,
         ])
     }
 }
