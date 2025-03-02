@@ -1,6 +1,7 @@
 use constraints::{
     lookup_sum_valid, CairoClaim, CairoComponents, CairoInteractionClaim, CairoRelations,
 };
+use preprocessed::PreProcessedTrace;
 use serde::{Deserialize, Serialize};
 use stwo_prover::core::backend::simd::SimdBackend;
 use stwo_prover::core::channel::Blake2sChannel;
@@ -15,6 +16,7 @@ use witness::CairoWitnessGen;
 use crate::input::CairoInput;
 
 mod constraints;
+pub mod preprocessed;
 mod witness;
 
 #[derive(Serialize, Deserialize)]
@@ -37,6 +39,12 @@ pub fn prove_cairo(input: CairoInput) -> Result<CairoProof, ProvingError> {
     // Setup protocol.
     let channel = &mut Blake2sChannel::default();
     let mut commitment_scheme = CommitmentSchemeProver::new(config, &twiddles);
+
+    // PP trace.
+    let mut tree_builder = commitment_scheme.tree_builder();
+    let pp_trace = PreProcessedTrace::new().gen_trace();
+    tree_builder.extend_evals(pp_trace);
+    tree_builder.commit(channel);
 
     let mut tree_builder = commitment_scheme.tree_builder();
     let witness_gen = CairoWitnessGen::new(input);
@@ -123,47 +131,39 @@ pub enum CairoVerificationError {
 
 #[cfg(test)]
 mod tests {
-    use cairo_lang_casm::casm;
-
-    use crate::cairo_air::{prove_cairo, verify_cairo, CairoInput};
-    use crate::input::plain::input_from_plain_casm;
-    use crate::input::vm_import::tests::small_cairo_input;
-
-    fn test_input() -> CairoInput {
-        let u128_max = u128::MAX;
-        let instructions = casm! {
-            // TODO(AlonH): Add actual range check segment.
-            // Manually writing range check builtin segment of size 40 to memory.
-            [ap] = u128_max, ap++;
-            [ap + 38] = 1, ap++;
-            ap += 38;
-
-            [ap] = 10, ap++;
-            call rel 4;
-            jmp rel 11;
-
-            jmp rel 4 if [fp-3] != 0;
-            jmp rel 6;
-            [ap] = [fp-3] + (-1), ap++;
-            call rel (-6);
-            ret;
-        }
-        .instructions;
-
-        input_from_plain_casm(instructions)
-    }
+    use super::prove_cairo;
+    use crate::input::instructions::{Instructions, VmState};
+    use crate::input::mem::{MemConfig, MemoryBuilder};
+    use crate::input::vm_import::MemEntry;
+    use crate::input::CairoInput;
 
     #[test]
-    #[ignore]
-    fn test_basic_cairo_air() {
-        let cairo_proof = prove_cairo(test_input()).unwrap();
-        verify_cairo(cairo_proof).unwrap();
-    }
+    fn dummmy_test() {
+        let [first, last] = [VmState {
+            pc: 0,
+            ap: 0,
+            fp: 0,
+        }; 2];
+        let instructions = Instructions {
+            initial_state: first,
+            final_state: last,
+            ..Default::default()
+        };
+        let memory = MemoryBuilder::from_iter(
+            MemConfig::default(),
+            (0..10).map(|i| MemEntry {
+                addr: i,
+                val: [i; 4],
+            }),
+        )
+        .build();
+        let public_mem_addresses = vec![0, 1, 2];
+        let input = CairoInput {
+            instructions,
+            memory,
+            public_mem_addresses,
+        };
 
-    #[ignore]
-    #[test]
-    fn test_full_cairo_air() {
-        let cairo_proof = prove_cairo(small_cairo_input()).unwrap();
-        verify_cairo(cairo_proof).unwrap();
+        prove_cairo(input).unwrap();
     }
 }

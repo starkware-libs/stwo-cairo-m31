@@ -9,7 +9,7 @@ use itertools::Itertools;
 use super::instructions::Instructions;
 use super::mem::{MemConfig, MemoryBuilder};
 use super::vm_import::MemEntry;
-use super::{CairoInput, SegmentAddrs};
+use super::CairoInput;
 
 pub fn input_from_plain_casm(casm: Vec<cairo_lang_casm::instructions::Instruction>) -> CairoInput {
     let felt_code = casm
@@ -71,11 +71,7 @@ pub fn input_from_finished_runner(runner: CairoRunner) -> CairoInput {
     let public_mem_addresses = (0..(program_len as u32)).collect_vec();
     CairoInput {
         instructions,
-        mem: mem.build(),
+        memory: mem.build(),
         public_mem_addresses,
-        range_check_builtin: SegmentAddrs {
-            begin_addr: 24,
-            end_addr: 64,
-        },
     }
 }
