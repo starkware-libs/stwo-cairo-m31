@@ -13,9 +13,9 @@ use stwo_prover::core::prover::StarkProof;
 use stwo_prover::core::vcs::ops::MerkleHasher;
 
 use super::preprocessed::PreProcessedTrace;
-use crate::components::memory;
+use crate::components::{addap_jmpabs_jmprel_opcode, memory};
 use crate::input::instructions::VmState;
-use crate::relations::MemoryRelation;
+use crate::relations::{MemoryRelation, StateRelation};
 
 #[derive(Serialize, Deserialize)]
 pub struct CairoProof<H: MerkleHasher> {
@@ -31,6 +31,7 @@ pub struct CairoClaim {
     pub initial_state: VmState,
     pub final_state: VmState,
 
+    pub addap_jmp: Option<addap_jmpabs_jmprel_opcode::Claim>,
     pub memory: memory::Claim,
     // pub ret: Vec<ret_opcode::Claim>,
     // ...
@@ -39,24 +40,32 @@ pub struct CairoClaim {
 impl CairoClaim {
     pub fn mix_into(&self, channel: &mut impl Channel) {
         // TODO(spapini): Add common values.
-        // self.ret.iter().for_each(|c| c.mix_into(channel));
+        if let Some(claim) = self.addap_jmp {
+            claim.mix_into(channel);
+        }
         self.memory.mix_into(channel);
     }
 
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
-        let mut log_sizes = TreeVec::concat_cols(chain!([self.memory.log_sizes()],));
+        let mut log_sizes = TreeVec::concat_cols(chain!([
+            self.addap_jmp
+                .map_or_else(Default::default, |c| c.log_sizes()),
+            self.memory.log_sizes()
+        ],));
         log_sizes[PREPROCESSED_TRACE_IDX] = PreProcessedTrace::new().log_sizes();
         log_sizes
     }
 }
 
-pub struct CairoRelations {
+pub struct CairoRelationElements {
+    pub vm: StateRelation,
     pub memory: MemoryRelation,
     // ...
 }
-impl CairoRelations {
-    pub fn draw(channel: &mut impl Channel) -> CairoRelations {
-        CairoRelations {
+impl CairoRelationElements {
+    pub fn draw(channel: &mut impl Channel) -> CairoRelationElements {
+        CairoRelationElements {
+            vm: StateRelation::draw(channel),
             memory: MemoryRelation::draw(channel),
         }
     }
@@ -64,7 +73,8 @@ impl CairoRelations {
 
 #[derive(Serialize, Deserialize)]
 pub struct CairoInteractionClaim {
-    pub addr_to_value: memory::InteractionClaim,
+    pub addap_jmp: Option<addap_jmpabs_jmprel_opcode::InteractionClaim>,
+    pub memory: memory::InteractionClaim,
     // pub ret: Vec<ret_opcode::InteractionClaim>,
     // ...
 }
@@ -72,15 +82,15 @@ pub struct CairoInteractionClaim {
 impl CairoInteractionClaim {
     pub fn mix_into(&self, channel: &mut impl Channel) {
         // self.ret.iter().for_each(|c| c.mix_into(channel));
-        self.addr_to_value.mix_into(channel);
+        self.memory.mix_into(channel);
     }
 }
 
-pub fn lookup_sum_valid(
+pub fn lookup_sum(
     claim: &CairoClaim,
-    elements: &CairoRelations,
+    elements: &CairoRelationElements,
     interaction_claim: &CairoInteractionClaim,
-) -> bool {
+) -> QM31 {
     let mut sum = QM31::zero();
     // Public memory.
     // TODO(spapini): Optimized inverse.
@@ -95,44 +105,60 @@ pub fn lookup_sum_valid(
         })
         .sum::<SecureField>();
     // TODO: include initial and final state.
-    // sum += interaction_claim.ret[0].logup_sums.1.unwrap().0;
-    sum += interaction_claim.addr_to_value.claimed_sum;
-    sum == SecureField::zero()
+    if let Some(ref claim) = interaction_claim.addap_jmp {
+        sum += claim.claimed_sum;
+    }
+    sum += interaction_claim.memory.claimed_sum;
+    sum
 }
 
 pub struct CairoComponents {
+    addap_jmp: Option<addap_jmpabs_jmprel_opcode::Component>,
     memory: memory::Component,
-    // ret: Vec<ret_opcode::Component>,
     // ...
 }
 
 impl CairoComponents {
     pub fn new(
         cairo_claim: &CairoClaim,
-        interaction_elements: &CairoRelations,
+        relation_elements: &CairoRelationElements,
         interaction_claim: &CairoInteractionClaim,
     ) -> Self {
         let tree_span_provider = &mut TraceLocationAllocator::new_with_preproccessed_columns(
             &PreProcessedTrace::new().ids(),
         );
 
-        let addr_to_value_component = memory::Component::new(
+        let addap_jmp = cairo_claim.addap_jmp.map(|claim| {
+            addap_jmpabs_jmprel_opcode::Component::new(
+                tree_span_provider,
+                addap_jmpabs_jmprel_opcode::Eval {
+                    claim,
+                    memory_relation_elemnts: relation_elements.memory.clone(),
+                    state_lookup: relation_elements.vm.clone(),
+                },
+                interaction_claim.addap_jmp.as_ref().unwrap().claimed_sum,
+            )
+        });
+
+        let memory = memory::Component::new(
             tree_span_provider,
             memory::Eval::new(
                 cairo_claim.memory.clone(),
-                interaction_elements.memory.clone(),
-                interaction_claim.addr_to_value.clone(),
+                relation_elements.memory.clone(),
+                interaction_claim.memory.clone(),
             ),
-            interaction_claim.addr_to_value.clone().claimed_sum,
+            interaction_claim.memory.clone().claimed_sum,
         );
-        Self {
-            // ret: ret_components,
-            memory: addr_to_value_component,
-        }
+        Self { addap_jmp, memory }
     }
 
     pub fn provers(&self) -> Vec<&dyn ComponentProver<SimdBackend>> {
-        vec![&self.memory]
+        let mut provers = vec![];
+        if let Some(prover) = &self.addap_jmp {
+            provers.push(prover as &dyn ComponentProver<_>);
+        }
+        provers.push(&self.memory);
+        provers
     }
 
     pub fn components(&self) -> Vec<&dyn Component> {

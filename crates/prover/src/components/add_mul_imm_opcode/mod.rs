@@ -14,7 +14,6 @@ mod tests {
     use stwo_prover::constraint_framework::{
         FrameworkComponent, FrameworkEval, TraceLocationAllocator,
     };
-    use stwo_prover::core::backend::simd::qm31::PackedSecureField;
     use stwo_prover::core::backend::simd::SimdBackend;
     use stwo_prover::core::channel::Blake2sChannel;
     use stwo_prover::core::fields::m31::M31;
@@ -51,7 +50,7 @@ mod tests {
         //        4: Z * 2
         //        5: Z
         let mut memory_claim_generator = memory::ClaimGenerator {
-            values: vec![PackedSecureField::from_array([
+            values: [
                 QM31::from_m31_array([add_ap_fp, M31(0), M31(0), M31(2)]),
                 QM31::from_m31_array([mul_fp_fp_appp, M31(1), M31(2), M31(2)]),
                 x + (QM31::one() + QM31::one()),
@@ -68,7 +67,9 @@ mod tests {
                 QM31::zero(),
                 QM31::zero(),
                 QM31::zero(),
-            ])],
+            ]
+            .map(Into::into)
+            .to_vec(),
             // Dummy multiplicities
             multiplicities: vec![1; 16],
         };

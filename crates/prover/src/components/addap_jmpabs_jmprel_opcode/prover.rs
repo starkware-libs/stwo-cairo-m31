@@ -5,6 +5,7 @@ use stwo_air_utils::trace::component_trace::ComponentTrace;
 use stwo_air_utils_derive::{IterMut, ParIterMut, Uninitialized};
 use stwo_prover::constraint_framework::logup::LogupTraceGenerator;
 use stwo_prover::constraint_framework::Relation;
+use stwo_prover::core::backend::simd::conversion::Pack;
 use stwo_prover::core::backend::simd::m31::{PackedM31, LOG_N_LANES, N_LANES};
 use stwo_prover::core::backend::simd::qm31::PackedQM31;
 use stwo_prover::core::backend::simd::SimdBackend;
@@ -13,7 +14,7 @@ use stwo_prover::core::pcs::TreeBuilder;
 use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleChannel;
 
 use super::component::{Claim, InteractionClaim};
-use crate::components::addap_jmpabs_jmprel_opcode::component::INSTRUCTION_BASE;
+use crate::components::addap_jmpabs_jmprel_opcode::component::ADD_AP_JMP_INSTRUCTION_BASE;
 use crate::components::memory;
 use crate::relations::{MemoryRelation, StateRelation, N_MEMORY_ELEMS, STATE_SIZE};
 use crate::utils::prover::decode_opcode;
@@ -29,23 +30,21 @@ pub struct ClaimGenerator {
     pub inputs: Vec<PackedCasmState>,
 }
 impl ClaimGenerator {
-    pub fn new(mut inputs: Vec<CasmState>) -> Self {
-        assert!(!inputs.is_empty());
+    pub fn new(mut inputs: Vec<CasmState>) -> Option<Self> {
+        if inputs.is_empty() {
+            return None;
+        };
 
         // TODO(spapini): Split to multiple components.
         let size = std::cmp::max(inputs.len().next_power_of_two(), N_LANES);
-        inputs.resize(size, inputs[0].clone());
+        inputs.resize(size, inputs[0]);
 
         let inputs = inputs
             .into_iter()
             .array_chunks::<N_LANES>()
-            .map(|chunk| PackedCasmState {
-                pc: PackedM31::from_array(std::array::from_fn(|i| chunk[i].pc)),
-                ap: PackedM31::from_array(std::array::from_fn(|i| chunk[i].ap)),
-                fp: PackedM31::from_array(std::array::from_fn(|i| chunk[i].fp)),
-            })
+            .map(Pack::pack)
             .collect_vec();
-        Self { inputs }
+        Some(Self { inputs })
     }
 
     pub fn write_trace(
@@ -159,7 +158,7 @@ fn write_trace_simd(
                 memory_trace_generator.deduce_output(pc).into_packed_m31s();
             *lookup_data.memory[0] = [pc, opcode, imm, off0, off1];
 
-            let [op_type] = decode_opcode(INSTRUCTION_BASE, opcode, [3]);
+            let [op_type] = decode_opcode(M31(ADD_AP_JMP_INSTRUCTION_BASE), opcode, [3]);
 
             *row[3] = op_type;
             *row[4] = imm;

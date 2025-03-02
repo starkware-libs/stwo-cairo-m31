@@ -14,7 +14,6 @@ mod tests {
     use stwo_prover::constraint_framework::{
         FrameworkComponent, FrameworkEval, TraceLocationAllocator,
     };
-    use stwo_prover::core::backend::simd::qm31::PackedSecureField;
     use stwo_prover::core::backend::simd::SimdBackend;
     use stwo_prover::core::channel::Blake2sChannel;
     use stwo_prover::core::fields::m31::M31;
@@ -26,6 +25,7 @@ mod tests {
     use super::*;
     use crate::components::add_mul_opcode::component::INSTRUCTION_BASE;
     use crate::components::memory;
+    use crate::input::mem::MemoryValue;
     use crate::relations;
     use crate::utils::types::CasmState;
 
@@ -53,7 +53,7 @@ mod tests {
         //        5: Z * Y
         //        6: Z
         let mut memory_claim_generator = memory::ClaimGenerator {
-            values: vec![PackedSecureField::from_array([
+            values: [
                 QM31::from_m31_array([add_ap_ap_fp, M31(0), M31(0), M31(0)]),
                 QM31::from_m31_array([mul_fp_fp_ap_appp, M31(1), M31(2), M31(1)]),
                 x + x,
@@ -62,15 +62,10 @@ mod tests {
                 z * y,
                 z,
                 QM31::zero(),
-                QM31::zero(),
-                QM31::zero(),
-                QM31::zero(),
-                QM31::zero(),
-                QM31::zero(),
-                QM31::zero(),
-                QM31::zero(),
-                QM31::zero(),
-            ])],
+            ]
+            .into_iter()
+            .map(MemoryValue)
+            .collect(),
             // Dummy multiplicities
             multiplicities: vec![1; 16],
         };
