@@ -33,7 +33,6 @@ impl PreProcessedTrace {
     fn columns(&self) -> Vec<&dyn PreProcessedColumn> {
         let mut columns: Vec<&dyn PreProcessedColumn> = vec![];
         columns.extend(self.range_check_columns.iter().map(|c| c.as_ref()));
-
         // Sort columns by descending log size.
         columns
             .into_iter()
