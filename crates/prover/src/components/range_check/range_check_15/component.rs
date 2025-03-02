@@ -74,14 +74,9 @@ impl Claim {
     }
 
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
-        let preprocessed_log_sizes = vec![self.log_size];
-        let trace_log_sizes = vec![self.log_size; N_TRACE_COLUMNS];
-        let interaction_log_sizes = vec![self.log_size; SECURE_EXTENSION_DEGREE];
-        TreeVec::new(vec![
-            preprocessed_log_sizes,
-            trace_log_sizes,
-            interaction_log_sizes,
-        ])
+        let trace = vec![self.log_size; N_TRACE_COLUMNS];
+        let interaction_trace = vec![self.log_size; SECURE_EXTENSION_DEGREE];
+        TreeVec::new(vec![vec![], trace, interaction_trace])
     }
 }
 
