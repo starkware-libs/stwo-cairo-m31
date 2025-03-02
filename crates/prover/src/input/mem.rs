@@ -153,6 +153,18 @@ impl DerefMut for MemoryBuilder {
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct MemoryValue(pub QM31);
 
+impl From<QM31> for MemoryValue {
+    fn from(value: QM31) -> MemoryValue {
+        MemoryValue(value)
+    }
+}
+
+impl From<MemoryValue> for QM31 {
+    fn from(value: MemoryValue) -> QM31 {
+        value.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
 

@@ -1,10 +1,12 @@
 use constraints::{
-    lookup_sum_valid, CairoClaim, CairoComponents, CairoInteractionClaim, CairoRelations,
+    lookup_sum, CairoClaim, CairoComponents, CairoInteractionClaim, CairoRelationElements,
 };
+use num_traits::Zero;
 use preprocessed::PreProcessedTrace;
 use serde::{Deserialize, Serialize};
 use stwo_prover::core::backend::simd::SimdBackend;
 use stwo_prover::core::channel::Blake2sChannel;
+use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig};
 use stwo_prover::core::poly::circle::{CanonicCoset, PolyOps};
 use stwo_prover::core::prover::{prove, verify, ProvingError, StarkProof, VerificationError};
@@ -53,17 +55,16 @@ pub fn prove_cairo(input: CairoInput) -> Result<CairoProof, ProvingError> {
     tree_builder.commit(channel);
 
     // Draw interaction elements.
-    let interaction_elements = CairoRelations::draw(channel);
+    let interaction_elements = CairoRelationElements::draw(channel);
 
     // Interaction trace.
     let mut tree_builder = commitment_scheme.tree_builder();
     let interaction_claim =
         interaction_generator.write_interaction_trace(&mut tree_builder, &interaction_elements);
-    debug_assert!(lookup_sum_valid(
-        &claim,
-        &interaction_elements,
-        &interaction_claim
-    ));
+    debug_assert_eq!(
+        lookup_sum(&claim, &interaction_elements, &interaction_claim),
+        QM31::zero()
+    );
     interaction_claim.mix_into(channel);
     tree_builder.commit(channel);
 
@@ -97,8 +98,8 @@ pub fn verify_cairo(
     commitment_scheme_verifier.commit(stark_proof.commitments[0], &claim.log_sizes()[0], channel);
     claim.mix_into(channel);
     commitment_scheme_verifier.commit(stark_proof.commitments[1], &claim.log_sizes()[1], channel);
-    let interaction_elements = CairoRelations::draw(channel);
-    if !lookup_sum_valid(&claim, &interaction_elements, &interaction_claim) {
+    let interaction_elements = CairoRelationElements::draw(channel);
+    if !lookup_sum(&claim, &interaction_elements, &interaction_claim).is_zero() {
         return Err(CairoVerificationError::InvalidLogupSum);
     }
     interaction_claim.mix_into(channel);
@@ -128,6 +129,7 @@ pub enum CairoVerificationError {
 #[cfg(test)]
 mod tests {
     use super::{prove_cairo, verify_cairo};
+    use crate::components::addap_jmpabs_jmprel_opcode::component::ADD_AP_JMP_INSTRUCTION_BASE;
     use crate::input::instructions::{Instructions, VmState};
     use crate::input::mem::{MemConfig, MemoryBuilder};
     use crate::input::vm_import::MemEntry;
@@ -162,5 +164,36 @@ mod tests {
 
         let proof = prove_cairo(input).unwrap();
         verify_cairo(proof).unwrap();
+    }
+
+    #[test]
+    fn jrl0_proof() {
+        let jrl0_addr = 1;
+        let memory_builder = MemoryBuilder::from_iter(
+            MemConfig::default(),
+            (0..10).map(|i| MemEntry {
+                addr: i,
+                val: [ADD_AP_JMP_INSTRUCTION_BASE + 2, 0, 0, 0],
+            }),
+        );
+        let memory = memory_builder.build();
+        let state = VmState {
+            pc: jrl0_addr,
+            ap: 2,
+            fp: 4,
+        };
+        let instructions = Instructions {
+            initial_state: state,
+            final_state: state,
+            addap_jmp: vec![state],
+        };
+        let input = CairoInput {
+            instructions,
+            memory,
+            public_mem_addresses: vec![],
+        };
+
+        let cairo_proof = prove_cairo(input).unwrap();
+        verify_cairo(cairo_proof).unwrap();
     }
 }

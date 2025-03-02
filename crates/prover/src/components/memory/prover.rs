@@ -1,12 +1,14 @@
 use itertools::Itertools;
+use num_traits::Zero;
 use stwo_prover::constraint_framework::logup::LogupTraceGenerator;
 use stwo_prover::constraint_framework::Relation;
 use stwo_prover::core::backend::simd::column::BaseColumn;
 use stwo_prover::core::backend::simd::m31::{PackedBaseField, PackedM31, LOG_N_LANES, N_LANES};
-use stwo_prover::core::backend::simd::qm31::PackedSecureField;
+use stwo_prover::core::backend::simd::qm31::{PackedQM31, PackedSecureField};
 use stwo_prover::core::backend::simd::SimdBackend;
 use stwo_prover::core::backend::{Col, Column};
 use stwo_prover::core::fields::m31::{BaseField, M31};
+use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::pcs::TreeBuilder;
 use stwo_prover::core::poly::circle::{CanonicCoset, CircleEvaluation};
 use stwo_prover::core::poly::BitReversedOrder;
@@ -21,28 +23,17 @@ use crate::relations::MemoryRelation;
 
 #[derive(Debug)]
 pub struct ClaimGenerator {
-    pub values: Vec<PackedSecureField>,
+    pub values: Vec<MemoryValue>,
     pub multiplicities: Vec<u32>,
 }
 impl ClaimGenerator {
     pub fn new(mem: &Memory) -> Self {
-        // TODO(spapini): Split to multiple components.
-        // TODO(spapini): More repetitions, for efficiency.
-        let mut values = (0..mem.address_to_value_index.len())
+        let values = (0..mem.address_to_value_index.len())
             .map(|addr| mem.get(addr as u32))
             .collect_vec();
-
-        let size = values.len().next_power_of_two();
-        assert!(size <= MEMORY_ADDRESS_BOUND);
-        values.resize(size, MemoryValue(Default::default()));
-
-        let values = values
-            .into_iter()
-            .map(|mem_value| mem_value.0)
-            .array_chunks::<N_LANES>()
-            .map(PackedSecureField::from_array)
-            .collect_vec();
+        let size = values.len();
         let multiplicities = vec![0; size];
+
         Self {
             values,
             multiplicities,
@@ -51,9 +42,7 @@ impl ClaimGenerator {
 
     pub fn deduce_output(&self, input: PackedM31) -> PackedSecureField {
         let indices = input.to_array().map(|i| usize::try_from(i.0).unwrap());
-        PackedSecureField::from_array(
-            indices.map(|i| self.values[i / N_LANES].to_array()[i % N_LANES]),
-        )
+        PackedSecureField::from_array(indices.map(|i| self.values[i].0))
     }
 
     pub fn add_inputs(&mut self, memory_index: usize) {
@@ -68,18 +57,28 @@ impl ClaimGenerator {
     }
 
     pub fn write_trace(
-        &mut self,
+        self,
         tree_builder: &mut TreeBuilder<'_, '_, SimdBackend, Blake2sMerkleChannel>,
     ) -> (Claim, InteractionClaimGenerator) {
-        let size = self.values.len() * N_LANES;
+        let size = self.values.len().next_power_of_two();
         let mut trace = (0..N_COLUMNS)
             .map(|_| Col::<SimdBackend, BaseField>::zeros(size))
             .collect_vec();
+        let mut values = self.values;
+        let mut mults = self.multiplicities;
+        values.resize(size, MemoryValue(QM31::zero()));
+        mults.resize(size, 0);
+        assert!(size <= MEMORY_ADDRESS_BOUND);
+        let packed_values = values
+            .into_iter()
+            .map(|v| v.0)
+            .array_chunks::<N_LANES>()
+            .map(PackedQM31::from_array);
 
         let inc = PackedBaseField::from_array(std::array::from_fn(|i| {
             M31::from_u32_unchecked((i) as u32)
         }));
-        for (i, values) in self.values.iter().enumerate() {
+        for (i, values) in packed_values.enumerate() {
             // TODO(AlonH): Either create a constant column for the addresses and remove it from
             // here or add constraints to the column here.
             trace[0].data[i] =
@@ -88,12 +87,8 @@ impl ClaimGenerator {
                 trace[j + 1].data[i] = value;
             }
         }
-        trace[MULTIPLICITY_COLUMN_OFFSET] = BaseColumn::from_iter(
-            self.multiplicities
-                .clone()
-                .into_iter()
-                .map(BaseField::from_u32_unchecked),
-        );
+        trace[MULTIPLICITY_COLUMN_OFFSET] =
+            BaseColumn::from_iter(mults.into_iter().map(BaseField::from_u32_unchecked));
         // Lookup data.
         let ids_and_values: [Vec<PackedM31>; N_ADDR_AND_VALUE_COLUMNS] = trace
             [0..N_ADDR_AND_VALUE_COLUMNS]

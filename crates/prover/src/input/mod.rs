@@ -2,7 +2,6 @@ use instructions::Instructions;
 use mem::Memory;
 use serde::{Deserialize, Serialize};
 
-mod decode;
 pub mod instructions;
 pub mod mem;
 pub mod plain;
