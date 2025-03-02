@@ -23,6 +23,7 @@ use self::deref::*;
 use self::hints::*;
 use self::jmp::*;
 use self::jnz::*;
+use crate::adapter::AirStates;
 use crate::memory::relocatable::{MaybeRelocatable, Relocatable, Segment};
 use crate::memory::{MaybeRelocatableAddr, Memory};
 use crate::utils::{get_tests_data_dir, m31_from_hex_str, maybe_resize, u32_from_usize};
@@ -144,6 +145,7 @@ pub struct VM {
     memory: Memory,
     state: State,
     hint_runner: HintRunner,
+    air_states: AirStates,
 }
 
 impl VM {
@@ -220,6 +222,7 @@ impl VM {
             memory,
             state,
             hint_runner,
+            air_states: AirStates::new(),
         }
     }
 
@@ -236,6 +239,7 @@ impl VM {
         let Instruction { op, args } = instruction.into();
         let instruction_fn = opcode_to_instruction(op);
 
+        self.air_states.add_state(op, &self.state);
         self.state = instruction_fn(&mut self.memory, self.state, args);
     }
 
