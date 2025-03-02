@@ -1,7 +1,7 @@
 use itertools::chain;
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
-use stwo_prover::constraint_framework::{Relation, TraceLocationAllocator};
+use stwo_prover::constraint_framework::{Relation, TraceLocationAllocator, PREPROCESSED_TRACE_IDX};
 use stwo_prover::core::air::{Component, ComponentProver};
 use stwo_prover::core::backend::simd::SimdBackend;
 use stwo_prover::core::channel::Channel;
@@ -44,10 +44,9 @@ impl CairoClaim {
     }
 
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
-        TreeVec::concat_cols(chain!(
-            // self.ret.iter().map(|c| c.log_sizes()),
-            [self.memory.log_sizes()],
-        ))
+        let mut log_sizes = TreeVec::concat_cols(chain!([self.memory.log_sizes()],));
+        log_sizes[PREPROCESSED_TRACE_IDX] = PreProcessedTrace::new().log_sizes();
+        log_sizes
     }
 }
 
@@ -137,6 +136,9 @@ impl CairoComponents {
     }
 
     pub fn components(&self) -> Vec<&dyn Component> {
-        vec![&self.memory]
+        self.provers()
+            .into_iter()
+            .map(|component| component as &dyn Component)
+            .collect()
     }
 }

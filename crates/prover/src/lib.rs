@@ -1,4 +1,10 @@
-#![feature(portable_simd, array_chunks, iter_array_chunks, raw_slice_split)]
+#![feature(
+    portable_simd,
+    array_chunks,
+    iter_array_chunks,
+    raw_slice_split,
+    trait_upcasting
+)]
 pub mod cairo_air;
 pub mod components;
 pub mod input;
