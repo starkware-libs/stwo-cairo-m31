@@ -65,7 +65,9 @@ impl ClaimGenerator {
         });
         tree_builder.extend_evals(trace.to_evals());
         (
-            Claim { n_rows },
+            Claim {
+                log_size: n_rows.ilog2(),
+            },
             InteractionClaimGenerator {
                 n_rows,
                 lookup_data,

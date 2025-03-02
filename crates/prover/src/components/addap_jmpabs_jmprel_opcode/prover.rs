@@ -10,7 +10,6 @@ use stwo_prover::core::backend::simd::qm31::PackedQM31;
 use stwo_prover::core::backend::simd::SimdBackend;
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::pcs::TreeBuilder;
-use stwo_prover::core::utils::bit_reverse_coset_to_circle_domain_order;
 use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleChannel;
 
 use super::component::{Claim, InteractionClaim};
@@ -50,7 +49,7 @@ impl ClaimGenerator {
     }
 
     pub fn write_trace(
-        mut self,
+        self,
         tree_builder: &mut TreeBuilder<'_, '_, SimdBackend, Blake2sMerkleChannel>,
         memory_trace_generator: &mut memory::ClaimGenerator,
     ) -> (Claim, InteractionClaimGenerator) {
@@ -58,21 +57,16 @@ impl ClaimGenerator {
 
         let n_rows = self.inputs.len();
         assert_ne!(n_rows, 0);
-        let size = std::cmp::max(n_rows.next_power_of_two(), N_LANES);
-        let need_padding = n_rows != size;
 
-        if need_padding {
-            self.inputs
-                .resize(size, self.inputs.first().unwrap().clone());
-            bit_reverse_coset_to_circle_domain_order(&mut self.inputs);
-        }
         lookup_data.memory.iter().for_each(|c| {
             c.iter()
                 .for_each(|v| memory_trace_generator.add_inputs_simd(&v[0]))
         });
         tree_builder.extend_evals(trace.to_evals());
         (
-            Claim { n_rows },
+            Claim {
+                log_size: n_rows.ilog2(),
+            },
             InteractionClaimGenerator {
                 n_rows,
                 lookup_data,

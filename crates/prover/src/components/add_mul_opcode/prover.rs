@@ -50,6 +50,7 @@ impl ClaimGenerator {
         memory_trace_generator: &mut memory::ClaimGenerator,
     ) -> (Claim, InteractionClaimGenerator) {
         let (trace, lookup_data) = write_trace_simd(&self.inputs, memory_trace_generator);
+
         lookup_data.memory.iter().for_each(|c| {
             c.iter()
                 .for_each(|v| memory_trace_generator.add_inputs_simd(&v[0]))
@@ -57,7 +58,9 @@ impl ClaimGenerator {
         tree_builder.extend_evals(trace.to_evals());
         let n_rows = self.inputs.len() * N_LANES;
         (
-            Claim { n_rows },
+            Claim {
+                log_size: n_rows.ilog2(),
+            },
             InteractionClaimGenerator {
                 n_rows,
                 lookup_data,
