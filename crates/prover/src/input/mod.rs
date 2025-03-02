@@ -14,11 +14,8 @@ pub const N_REGISTERS: usize = 3;
 #[derive(Debug)]
 pub struct CairoInput {
     pub instructions: Instructions,
-    pub mem: Memory,
+    pub memory: Memory,
     pub public_mem_addresses: Vec<u32>,
-
-    // Builtins.
-    pub range_check_builtin: SegmentAddrs,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
