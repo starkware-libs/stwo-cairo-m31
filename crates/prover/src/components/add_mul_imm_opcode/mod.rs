@@ -8,7 +8,7 @@ pub use prover::ClaimGenerator;
 mod tests {
 
     use itertools::{chain, Itertools};
-    use num_traits::{One, Zero};
+    use num_traits::Zero;
     use rand::rngs::SmallRng;
     use rand::{Rng, SeedableRng};
     use stwo_prover::constraint_framework::{
@@ -36,9 +36,9 @@ mod tests {
         let mut rng = SmallRng::seed_from_u64(0);
 
         #[allow(clippy::erasing_op, clippy::identity_op)]
-        let add_ap_fp = INSTRUCTION_BASE + M31(0 + 0 * 2 + 1 * 4 + 0 * 8);
+        let add_ap_fp = INSTRUCTION_BASE + M31(0 + 0 * 2 + 1 * 4 + 1 * 8 + 0 * 24);
         #[allow(clippy::erasing_op, clippy::identity_op)]
-        let mul_fp_fp_appp = INSTRUCTION_BASE + M31(1 + 1 * 2 + 1 * 4 + 1 * 8);
+        let mul_fp_fp_appp = INSTRUCTION_BASE + M31(1 + 1 * 2 + 1 * 4 + 2 * 8 + 1 * 24);
         let x: QM31 = rng.gen();
         let z: QM31 = rng.gen();
 
@@ -52,10 +52,10 @@ mod tests {
         let mut memory_claim_generator = memory::ClaimGenerator {
             values: [
                 QM31::from_m31_array([add_ap_fp, M31(0), M31(0), M31(2)]),
-                QM31::from_m31_array([mul_fp_fp_appp, M31(1), M31(2), M31(2)]),
-                x + (QM31::one() + QM31::one()),
+                QM31::from_m31_array([mul_fp_fp_appp, M31(1), M31(2), M31(3)]),
+                x + QM31::from_m31(M31(0), M31(2), M31(0), M31(0)),
                 x,
-                z * (QM31::one() + QM31::one()),
+                z * QM31::from_m31(M31(0), M31(0), M31(3), M31(0)),
                 z,
                 QM31::zero(),
                 QM31::zero(),
