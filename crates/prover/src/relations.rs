@@ -1,3 +1,4 @@
+#![allow(non_camel_case_types)]
 use stwo_prover::relation;
 
 pub const ADDR_SIZE: usize = 1;
@@ -7,3 +8,4 @@ pub const STATE_SIZE: usize = 3;
 
 relation!(MemoryRelation, N_MEMORY_ELEMS);
 relation!(StateRelation, STATE_SIZE);
+relation!(RangeCheck_16, 1);
