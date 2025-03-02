@@ -6,6 +6,7 @@ pub mod hints;
 pub mod jmp;
 pub mod jnz;
 pub mod operand;
+pub mod range_check;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
@@ -23,6 +24,7 @@ use self::deref::*;
 use self::hints::*;
 use self::jmp::*;
 use self::jnz::*;
+use self::range_check::*;
 use crate::memory::relocatable::{MaybeRelocatable, Relocatable, Segment};
 use crate::memory::{MaybeRelocatableAddr, Memory};
 use crate::utils::{get_tests_data_dir, m31_from_hex_str, maybe_resize, u32_from_usize};
@@ -434,6 +436,8 @@ fn opcode_to_instruction(opcode: M31) -> InstructionFn {
         169 => jnz_imm_fp,
         170 => jnz_imm_fp_appp,
         171 => ret,
+        172 => range_check_ap,
+        173 => range_check_fp,
         _ => panic!("Unknown opcode: {}.", opcode),
     }
 }
