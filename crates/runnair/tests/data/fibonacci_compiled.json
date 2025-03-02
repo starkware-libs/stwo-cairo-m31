@@ -695,18 +695,24 @@
         "1": [
             {
                 "accessible_scopes": [
-                    "__main__",
-                    "__main__.main"
                 ],
-                "code": "memory[state.fp] = input['fibonacci_claim_index'];",
+                "code": {
+                    "WriteRunParam": {
+                        "index": {
+                            "Immediate": "0x0"
+                        },
+                        "dst": {
+                            "register": "FP",
+                            "offset": 0
+                        }
+                    }
+                },
                 "flow_tracking_data": {
                     "ap_tracking": {
                         "group": 0,
                         "offset": 1
                     },
                     "reference_ids": {
-                        "__main__.main.fibonacci_claim_index": 1,
-                        "__main__.main.output_ptr": 0
                     }
                 }
             }
