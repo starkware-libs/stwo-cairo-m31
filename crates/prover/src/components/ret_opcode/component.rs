@@ -8,8 +8,9 @@ use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
 use stwo_prover::core::pcs::TreeVec;
 
 use crate::relations::{MemoryRelation, StateRelation};
+use crate::utils::component::is_bit;
 
-pub const RET_N_TRACE_CELLS: usize = 5;
+pub const RET_N_TRACE_CELLS: usize = 6;
 // TODO(alont): set instruction bases to not overlap
 pub const RET_INSTRUCTION: M31 = M31::from_u32_unchecked(0);
 pub type Component = FrameworkComponent<Eval>;
@@ -31,10 +32,15 @@ impl Eval {
     }
 
     pub fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
+        let mult = eval.next_trace_mask();
+        eval.add_constraint(is_bit::<E>(&mult));
         // Initial state.
         let state = std::array::from_fn(|_| eval.next_trace_mask());
-        // Use initial state.
-        eval.add_to_relation(RelationEntry::new(&self.state_lookup, E::EF::one(), &state));
+        eval.add_to_relation(RelationEntry::new(
+            &self.state_lookup,
+            mult.clone().into(),
+            &state,
+        ));
         let [pc, ap, fp] = state;
 
         // Lookup pc.
@@ -64,10 +70,11 @@ impl Eval {
         let new_pc = fp_minus_one_val;
         let new_fp = fp_minus_two_val;
 
+        // Yield last state.
         let new_state = [new_pc, ap, new_fp];
         eval.add_to_relation(RelationEntry::new(
             &self.state_lookup,
-            -E::EF::one(),
+            -E::EF::one() * mult,
             &new_state,
         ));
 
