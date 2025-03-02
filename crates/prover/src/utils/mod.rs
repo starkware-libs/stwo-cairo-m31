@@ -5,6 +5,7 @@ pub mod types;
 use std::ops::{Add, Mul, Sub};
 
 use num_traits::One;
+use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::FieldExpOps;
 
 pub struct Selector();
@@ -26,13 +27,13 @@ where
 
 impl<T> SelectorTrait<T, 3> for Selector
 where
-    T: Clone + One + Mul<Output = T> + Add<Output = T> + Sub<Output = T> + FieldExpOps,
+    T: Clone + One + Mul<Output = T> + Add<Output = T> + Sub<Output = T> + FieldExpOps + From<M31>,
 {
     fn select(selector: &T, [a, b, c]: [&T; 3]) -> T {
         let selector_minus_1 = selector.clone() - T::one();
         let two = T::one() + T::one();
         let selector_minus_2 = selector.clone() - two.clone();
-        let field_half = two.inverse();
+        let field_half = T::from(M31(1073741824));
 
         (selector_minus_2.clone() * selector_minus_1.clone() * field_half.clone() * a.clone())
             - (selector_minus_2 * selector.clone() * b.clone())

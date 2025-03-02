@@ -41,7 +41,7 @@ impl ClaimGenerator {
         let log_n_packed_rows = log_size - LOG_N_LANES;
 
         // Prepare inputs.
-        self.inputs.resize(size, self.inputs[0].clone());
+        self.inputs.resize(size, self.inputs[0]);
         let inputs = self
             .inputs
             .into_iter()
