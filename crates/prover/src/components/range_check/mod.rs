@@ -1,5 +1,6 @@
 pub mod range_check_15;
 pub mod range_check_16;
+pub mod range_check_opcode;
 
 use std::iter::zip;
 use std::simd::Simd;
