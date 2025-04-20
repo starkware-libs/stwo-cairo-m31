@@ -33,8 +33,12 @@ fn resolve_jnz_imm_args(
 ) -> (M31, QM31) {
     let [cond_addr] = resolve_addresses(state, &[base], &[offsets[1]]);
     let destination = offsets[0];
-    let Some(MaybeRelocatable::Absolute(condition)) = memory.get(cond_addr) else {
-        panic!("Condition must be an absolute value.")
+    let opt_val = memory.get(cond_addr);
+    let Some(MaybeRelocatable::Absolute(condition)) = opt_val else {
+        panic!(
+            "Condition must be an absolute value. Got: {:?} at {:?}",
+            opt_val, cond_addr
+        )
     };
 
     (destination, condition)

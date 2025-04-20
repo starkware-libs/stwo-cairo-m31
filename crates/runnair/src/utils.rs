@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fields::qm31::QM31;
+// use stwo_prover::core::fields::qm31::QM31;
 
 // Converters.
 
@@ -9,10 +9,10 @@ pub(crate) fn m31_from_hex_str(x: &str) -> M31 {
     M31(u32::from_str_radix(x.trim_start_matches("0x"), 16).unwrap())
 }
 
-pub(crate) fn qm31_from_hex_str_array(x: [&str; 4]) -> QM31 {
-    let m31_array = x.map(m31_from_hex_str);
-    QM31::from_m31_array(m31_array)
-}
+// pub(crate) fn qm31_from_hex_str_array(x: [&str; 4]) -> QM31 {
+//     let m31_array = x.map(m31_from_hex_str);
+//     QM31::from_m31_array(m31_array)
+// }
 
 pub(crate) fn u32_from_usize(value: usize) -> u32 {
     u32::try_from(value).unwrap()

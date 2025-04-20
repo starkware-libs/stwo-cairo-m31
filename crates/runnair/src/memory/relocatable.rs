@@ -19,6 +19,29 @@ pub enum MaybeRelocatable<T: From<M31>> {
     Absolute(T),
 }
 
+impl PartialOrd<MaybeRelocatable<QM31>> for MaybeRelocatable<QM31> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (MaybeRelocatable::Relocatable(lhs), MaybeRelocatable::Relocatable(rhs)) => {
+                if lhs.segment != rhs.segment {
+                    return None;
+                }
+                lhs.offset.partial_cmp(&rhs.offset)
+            }
+            (MaybeRelocatable::Absolute(lhs), MaybeRelocatable::Absolute(rhs)) => {
+                let Ok(l): Result<M31, _> = (*lhs).try_into() else {
+                    return None;
+                };
+                let Ok(r): Result<M31, _> = (*rhs).try_into() else {
+                    return None;
+                };
+                Some(l.cmp(&r))
+            }
+            _ => None,
+        }
+    }
+}
+
 pub type RelocationTable = HashMap<Segment, M31>;
 
 impl Relocatable {
