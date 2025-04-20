@@ -1,4 +1,4 @@
-# The stwo-cairo-m31 repo contains WIP AIRs for the Stwo prover native to the M31 field. They are unaudited and not ready to be used in production. Additionally, the tooling to use these AIRs do not yet exists. 
+# The stwo-cairo-m31 repo contains WIP AIRs for the Stwo prover native to the M31 field. They are unaudited and not ready to be used in production. Additionally, the tooling to use these AIRs does not yet exists. 
 
 # stwo-cairo-air
 
